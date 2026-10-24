@@ -132,7 +132,10 @@ def _format_and_dataset(indices: dict[str, xr.DataArray], model_type: str) -> xr
                 f"{model_type}: index {k!r} time axis ({t.shape}) differs from the "
                 f"others ({ref.shape}) — annualization produced inconsistent calendars."
             )
-    return ds
+    # Percentile-based indices (WSDI/CSDI/R95p) come out dask-backed (lazy against
+    # the dask hist dataset); everything downstream (NaN checks, interp, to_df)
+    # expects plain numpy. No-op when already in-memory.
+    return ds.compute()
 
 
 def upscale(indices_ds: xr.Dataset) -> xr.Dataset:
