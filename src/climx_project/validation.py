@@ -108,14 +108,31 @@ def compute_gt_indices(y_raw_daily: xr.Dataset, historical_data_path) -> dict[st
 
 def _format_and_dataset(indices: dict[str, xr.DataArray], model_type: str) -> xr.Dataset:
     """format_indices (calendar unify + TXx/TNn/Rx5day annualization), drop any
-    forcing_scenario dim (the starter only does this when saving), to Dataset."""
+    forcing_scenario dim (the starter only does this when saving), to Dataset.
+
+    Also asserts all 15 indices end up on ONE shared annual time axis — xclim's
+    yearly indices and the resampled monthly ones must agree (otherwise the
+    submission would silently carry NaNs after to_array alignment).
+    """
     from src.utils.indices_utils import format_indices
 
     formatted = format_indices(indices, model_type, paths.DATA_VERSION, save_indices=False)
     for k, v in formatted.items():
         if "forcing_scenario" in v.dims:
             formatted[k] = v.isel(forcing_scenario=0, drop=True)
-    return xr.Dataset(formatted)
+
+    ds = xr.Dataset(formatted)
+    ref = None
+    for k in ds.data_vars:
+        t = np.asarray(ds[k]["time"].values)
+        if ref is None:
+            ref = t
+        elif t.shape != ref.shape or not np.array_equal(t, ref):
+            raise RuntimeError(
+                f"{model_type}: index {k!r} time axis ({t.shape}) differs from the "
+                f"others ({ref.shape}) — annualization produced inconsistent calendars."
+            )
+    return ds
 
 
 def upscale(indices_ds: xr.Dataset) -> xr.Dataset:

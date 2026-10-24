@@ -24,7 +24,7 @@ import pandas as pd
 import xarray as xr
 
 from . import paths
-from .validation import upscale
+from .validation import upscale, _format_and_dataset
 
 logger = logging.getLogger(__name__)
 
@@ -35,14 +35,8 @@ KAGGLE_COMPETITION = "climx-main-track"
 def build_submission(indices_pred: dict[str, xr.DataArray], model: str) -> Path:
     """Format, upscale, and write the submission parquet. Returns its path."""
     import src.utils.kaggle_submission as ks
-    from src.utils.indices_utils import format_indices
 
-    formatted = format_indices(indices_pred, model, paths.DATA_VERSION, save_indices=False)
-    for k, v in formatted.items():
-        if "forcing_scenario" in v.dims:
-            formatted[k] = v.isel(forcing_scenario=0, drop=True)
-
-    ds = xr.Dataset(formatted)
+    ds = _format_and_dataset(indices_pred, model)
     ds = upscale(ds)
 
     # Fail loudly BEFORE the writer can silently zero-fill NaNs.

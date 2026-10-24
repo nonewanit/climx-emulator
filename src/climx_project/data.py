@@ -69,13 +69,42 @@ def download_kaggle_bundle(competition: str = KAGGLE_COMPETITION) -> Path:
     return BUNDLE_ZIP
 
 
-def download_hf_lite() -> None:
-    """Fallback route: download lite/ from the Hugging Face mirror."""
-    from src.utils.hugging_face_utils import get_dataset_from_hf
+HF_MIRROR = "https://hf-mirror.com"  # huggingface.co is blocked on this network
+HF_REPO = "isp-uv-es/ClimX"
 
-    if not os.environ.get("HF_ENDPOINT"):
-        os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
-    get_dataset_from_hf(paths.DATA_DIR, "lite")
+# Everything the starter's open_climx_virtual_datasets globs for, plus the
+# convenience forcings_all.nc (26 MB — kept for parity with the HF layout).
+HF_LITE_FILES = (
+    "NorESM2-MM_r1i1p1f1_with_forcing_subsampled_16_hist_train_1850_1931.nc",
+    "NorESM2-MM_r1i1p1f1_with_forcing_subsampled_16_hist_train_1932_2014.nc",
+    "NorESM2-MM_r1i1p1f1_with_forcing_subsampled_16_train_ssp126.nc",
+    "NorESM2-MM_r1i1p1f1_with_forcing_subsampled_16_train_ssp370.nc",
+    "NorESM2-MM_r1i1p1f1_with_forcing_subsampled_16_train_ssp585.nc",
+    "NorESM2-MM_r1i1p1f1_with_forcing_subsampled_16_test_forcings_ssp245.nc",
+    "NorESM2-MM_r1i1p1f1_with_forcing_subsampled_16_forcings_all.nc",
+)
+
+
+def download_hf_lite() -> None:
+    """Fallback route: plain curl -4 against the HF mirror.
+
+    huggingface_hub's HTTP client prefers IPv6, which this machine cannot
+    route — curl -4 forces IPv4. Resumable (-C -) and idempotent.
+    """
+    paths.LITE_DIR.mkdir(parents=True, exist_ok=True)
+    for name in HF_LITE_FILES:
+        target = paths.LITE_DIR / name
+        if target.exists() and target.stat().st_size > 0:
+            logger.info("Already present: %s", name)
+            continue
+        url = f"{HF_MIRROR}/datasets/{HF_REPO}/resolve/main/lite/{name}"
+        cmd = ["curl", "-4", "-L", "-C", "-", "--retry", "3",
+               "--connect-timeout", "20", "-o", str(target), url]
+        logger.info("Downloading %s ...", name)
+        result = subprocess.run(cmd)
+        if result.returncode != 0 or not target.exists() or target.stat().st_size == 0:
+            raise RuntimeError(f"Download failed for {name} (curl exit {result.returncode})")
+    logger.info("Lite download complete.")
 
 
 def _nc_candidates() -> list[Path]:
