@@ -1,0 +1,21 @@
+# FFNN baseline: the starter's per-pixel MLP (PyTorch Lightning).
+# n_forcing_vars=22 is correct after the aerosol triple-split (the starter's
+# train.py still says 12 — stale). n_lat/n_lon stay 192/288 even on lite: the
+# spatial embedding is sized for the full grid.
+name: ffnn
+runner:
+  _target_: climx_project.runners.ffnn.run
+seed: 42
+model:
+  _target_: src.models.nn_model.NNBaseline
+  model_params:
+    n_lat: 192
+    n_lon: 288
+    n_forcing_vars: 22
+    n_target_vars: 7
+    learning_rate: 0.001
+    separate_output_heads: true
+trainer:
+  max_epochs: 5
+  pixel_batch: 4096
+  num_workers: 0

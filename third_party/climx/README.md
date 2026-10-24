@@ -1,0 +1,77 @@
+# ClimX: A Benchmark for Extreme-Aware Climate Model Emulation
+
+<p align="center">
+  <a href="https://philab.esa.int/"><img src="docs/imgs/esa_philab_logo_blue.svg" alt="ESA Φ-lab logo" width="320"></a><br>
+  <sub>Prizes provided by ESA Φ-lab</sub>
+</p>
+
+![ClimX diagram](climX_diagram.jpg)
+
+ClimX is a persistent benchmark for emulating high-resolution daily climate outputs from the NorESM2-MM Earth System Model, with special emphasis on accurately reproducing climate extremes (e.g., heatwaves, droughts, and extreme precipitation), not just mean climate behavior. A September 1–December 15, 2026 Kaggle challenge, with €3,300 in prizes provided by ESA Φ-lab, serves as a launch event to seed community use and establish an initial leaderboard.
+
+## At a glance
+
+- **Core task:** Predict daily, 1° resolution climate variables from greenhouse gas and aerosol forcings.
+- **Submission rule:** Models must predict the daily target variables first; leaderboard indices must be computed from those outputs with the official index code. The only operation allowed on computed indices is aggregation across realizations of the same emulator (an unweighted mean for the main track, or empirical quantiles for the UQ track). Fitted or tuned transforms of index maps, such as per-cell bias correction, temporal smoothing, or weighted blending of indices from different models, count as direct index prediction and are not allowed; apply such operations to the daily fields instead. Using training-scenario indices in losses, validation, or model selection is allowed, as long as the model output remains daily fields.
+- **Data:** Full dataset (~200GB, Hugging Face) and lightweight prototype dataset (<1GB, Kaggle).
+- **Evaluation:** Region-wise nNSE averaged across 15 extreme climate indices.
+- **Test setting:** Held-out SSP2-4.5 scenario.
+- **Optional track:** Probabilistic predictions are evaluated with CRPS on a separate Kaggle UQ track.
+
+## Getting started (recommended)
+
+For this repository, using **mamba** is recommended for faster and more reliable environment solves.
+
+```bash
+# one-time: install mamba into base conda
+conda install -n base -c conda-forge mamba
+
+# create the environment from this repo
+mamba env create -f environment.yml
+conda activate clima_emu_new
+```
+
+Then launch Jupyter and open `playground.ipynb`:
+
+```bash
+jupyter notebook
+```
+
+## Playground and key files
+
+- `playground.ipynb`: End-to-end notebook for data loading, preprocessing, training baseline models, evaluation, Kaggle submission formatting, and result visualization.
+- `environment.yml`: Full Python environment specification used by the notebook and training scripts.
+- `train.py`: Script-based baseline training workflow (useful when you prefer Python scripts over notebooks).
+- `src/`: Core code for preprocessing, models, metrics, utilities, and evaluation helpers.
+- `rnNSE.py`: Exact reference implementation of the Kaggle main-track leaderboard metric.
+
+## Main-track metric
+
+The main track uses region-wise normalized Nash–Sutcliffe efficiency (nNSE). For each climate index, a grid cell is valid when the population variance of its ground-truth time series is greater than `1e-6` (`ddof=0`). Only cells in the embedded AR6 land-region raster are scored. Cell nNSE values are weighted by cosine latitude within each region; valid regions are then weighted equally, followed by equal weighting across indices.
+
+The scorer expects complete `192×288` maps with rows ordered as time, latitude, then longitude. NaN and infinite predictions are invalid. See [`rnNSE.py`](rnNSE.py) for the exact implementation used by the competition.
+
+## Benchmark and challenge links
+
+- Kaggle main track: https://www.kaggle.com/competitions/climx-main-track
+- Kaggle UQ track: https://www.kaggle.com/competitions/climx-uq-track
+- Hugging Face dataset: https://huggingface.co/datasets/isp-uv-es/ClimX
+- Website: https://ipl-uv.github.io/ClimX/
+
+## Prizes
+
+<a href="https://philab.esa.int/"><img src="docs/imgs/esa_philab_logo_blue.svg" alt="ESA Φ-lab logo" width="240"></a>
+
+The launch challenge runs from September 1 through **December 15, 2026**; the benchmark remains available afterward.
+
+Main-track prizes totalling **€3,300** are provided by **ESA Φ-lab** (European Space Agency):
+
+- 1st place: €1,800
+- 2nd place: €1,000
+- 3rd place: €500
+
+Prizes go to the top three main-track teams on the official leaderboard metric, subject to open-sourcing code and weights and passing finalist reproducibility checks.
+
+## Publication
+
+The challenge results will be submitted as a competition paper to a leading peer-reviewed journal in the field. The top three teams will be invited to contribute as co-authors, subject to meaningful scientific contributions and the journal's authorship requirements.

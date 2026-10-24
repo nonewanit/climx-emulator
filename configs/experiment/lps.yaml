@@ -1,0 +1,7 @@
+# Linear Pattern Scaling baseline: CO2 -> global-mean tas -> per-pixel fields.
+name: lps
+runner:
+  _target_: climx_project.runners.lps.run
+fit:
+  co2_var: CO2_LBC
+  tas_var: tas

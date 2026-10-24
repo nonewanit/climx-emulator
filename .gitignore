@@ -1,0 +1,23 @@
+# Data and artifacts (downloaded datasets, preprocessing outputs, model checkpoints)
+data/
+results/runs/
+results/predictions/
+results/indices/
+results/models/
+results/submissions/
+outputs/
+lightning_logs/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+.ipynb_checkpoints/
+
+# Editor/OS
+.DS_Store
+.vscode/
+.idea/

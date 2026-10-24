@@ -1,0 +1,6 @@
+# Climatology baseline: predicts the historical (1850-2014) monthly climatology
+# cycle for every day of the test period. No training. Scores strongly negative
+# under SSP warming (~-0.5); that is expected, not a bug.
+name: climatology
+runner:
+  _target_: climx_project.runners.climatology.run

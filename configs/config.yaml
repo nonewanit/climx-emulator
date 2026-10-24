@@ -1,0 +1,14 @@
+# Top-level Hydra config. Choose the experiment on the CLI:
+#   python train.py experiment=ffnn
+# Shared settings live once here / in configs/data/; each experiment config
+# overrides only what differs.
+defaults:
+  - data: lite
+  - experiment: ???
+
+hydra:
+  job:
+    chdir: True   # per-run cwd; all repo paths are __file__-absolute, so safe
+  run:
+    # ${hydra:runtime.cwd} = the directory train.py was launched from (repo root)
+    dir: ${hydra:runtime.cwd}/results/runs/${name}/${now:%Y-%m-%d_%H-%M-%S}

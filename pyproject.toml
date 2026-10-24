@@ -1,0 +1,18 @@
+# Installs ONLY climx_project (our thin layer over the vendored starter kit).
+# It must never register a top-level `src` package, so that `import src...`
+# always resolves to third_party/climx via the sys.path insertion in
+# src/climx_project/__init__.py.
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "climx-project"
+version = "0.1.0"
+description = "ClimX Kaggle competition — course project pipeline (Tsinghua ML 80245013)"
+requires-python = ">=3.11"
+dependencies = []  # runtime deps come from environment.yml, not pip metadata
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["climx_project*"]
