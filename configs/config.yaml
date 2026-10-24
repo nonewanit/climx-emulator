@@ -3,6 +3,7 @@
 # Shared settings live once here / in configs/data/; each experiment config
 # overrides only what differs.
 defaults:
+  - _self_
   - data: lite
   - experiment: ???
 
