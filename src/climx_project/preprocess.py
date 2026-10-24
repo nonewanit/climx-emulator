@@ -38,7 +38,9 @@ def _save_chunked(ds: xr.Dataset, path: Path, *, encoding: dict | None = None) -
         ds[var].encoding.clear()
     logger.info("Writing %s ...", path.name)
     with ProgressBar():
-        ds.to_netcdf(path, encoding=encoding, compute=False)
+        # compute=False returns a dask Delayed that must be explicitly
+        # computed — discarding it writes only the file header, no data.
+        ds.to_netcdf(path, encoding=encoding, compute=False).compute()
     logger.info("Wrote %s", path.name)
 
 
