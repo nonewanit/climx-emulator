@@ -54,6 +54,20 @@ def _drop_aux_time_dims(ds: xr.Dataset) -> xr.Dataset:
     return ds
 
 
+def _strip_forcing_scenario(ds: xr.Dataset) -> xr.Dataset:
+    """Same cleanup the starter's evaluate() does before index computation.
+
+    A leftover scalar forcing_scenario coord (e.g. 'ssp370') clashes with the
+    hist dataset's 'historical' coord when xclim aligns data against the
+    historical period inside the percentile indices (WSDI/CSDI/R95p).
+    """
+    if "forcing_scenario" in ds.dims:
+        ds = ds.isel(forcing_scenario=0, drop=True)
+    if "forcing_scenario" in ds.coords:
+        ds = ds.drop_vars("forcing_scenario")
+    return ds
+
+
 def make_holdout_split(X_train: xr.Dataset, y_train: xr.Dataset, dataset):
     """Return (X_hold, y_raw) for SSP3-7.0, 2081-2100.
 
@@ -64,11 +78,13 @@ def make_holdout_split(X_train: xr.Dataset, y_train: xr.Dataset, dataset):
     scen_idx = _resolve_scenario_index(X_train)
     X_hold = X_train.isel(forcing_scenario=scen_idx).sel(time=slice(HOLDOUT_START, HOLDOUT_END))
     X_hold = _drop_aux_time_dims(X_hold)
+    X_hold = _strip_forcing_scenario(X_hold)
 
     raw = dataset.train
     raw_idx = _resolve_scenario_index(raw)
     y_raw = raw.isel(forcing_scenario=raw_idx).sel(time=slice(HOLDOUT_START, HOLDOUT_END))
     y_raw = _drop_aux_time_dims(y_raw)
+    y_raw = _strip_forcing_scenario(y_raw)
     y_raw = y_raw[paths.TARGET_VARIABLES]
 
     assert X_hold.sizes["time"] == y_raw.sizes["time"], (
