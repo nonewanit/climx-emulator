@@ -16,8 +16,8 @@ def run(cfg, dataset, X_train, y_train, metadata, X_test) -> dict:
     emulator = LPSBaseline()
     emulator.fit(
         X_train, y_train,
-        co2_var=cfg.fit.co2_var,
-        tas_var=cfg.fit.tas_var,
+        co2_var=cfg.experiment.fit.co2_var,
+        tas_var=cfg.experiment.fit.tas_var,
     )
     paths.MODELS_DIR.mkdir(parents=True, exist_ok=True)
     emulator.save(paths.MODELS_DIR / "lps.pt")

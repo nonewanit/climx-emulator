@@ -11,7 +11,7 @@ Proposal lives next door in [`../proposal/`](../proposal/). Kaggle closes
   `python train.py experiment=<name>`.
 - `configs/` — one YAML per approach (`configs/experiment/*.yaml`), composed by
   Hydra with shared defaults in `configs/config.yaml` + `configs/data/lite.yaml`.
-  CLI overrides work anywhere: `python train.py experiment=ffnn trainer.max_epochs=1`.
+  CLI overrides work anywhere: `python train.py experiment=ffnn experiment.trainer.max_epochs=1`.
 - `src/climx_project/` — shared plumbing, written **once** and reused by every
   approach: data download/mapping, preprocessing wrappers, the local validation
   harness (official `rnNSE.py` scorer), submission parquet builder/verifier.

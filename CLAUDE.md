@@ -13,7 +13,7 @@ source ~/miniforge3/etc/profile.d/conda.sh && conda activate climx   # conda env
 pip install -e .          # installs ONLY climx_project; run from repo root
 ```
 
-- `python train.py experiment=climatology|lps|ffnn` — run an approach (single Hydra entry point; CLI overrides like `trainer.max_epochs=1` work anywhere; `-m` for multirun).
+- `python train.py experiment=climatology|lps|ffnn` — run an approach (single Hydra entry point; CLI overrides like `experiment.trainer.max_epochs=1` work anywhere; `-m` for multirun).
 - `make data | preprocess | climatology | lps | ffnn | verify FILE=... | submit FILE=... MSG=...` — pipeline stages.
 - Module CLIs: `python -m climx_project.data {download,download-hf,map-lite,check}`, `python -m climx_project.preprocess`, `python -m climx_project.submission {verify,submit}`.
 - No tests/linter; correctness is verified by the run artifacts (sizes, `results/scores.md`, parquet invariants).
