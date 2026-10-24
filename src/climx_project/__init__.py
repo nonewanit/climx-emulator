@@ -33,6 +33,9 @@ _VENDOR = Path(__file__).resolve().parents[2] / "third_party" / "climx"
 if str(_VENDOR) not in sys.path:
     sys.path.insert(0, str(_VENDOR))
 
+from . import compat  # noqa: E402  (xarray strftime/ArrowStringArray patch)
 from . import paths  # noqa: E402,F401  (imported after vendor activation)
+
+compat.apply()
 
 __all__ = ["paths"]
