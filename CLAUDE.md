@@ -39,6 +39,7 @@ pip install -e .          # installs ONLY climx_project; run from repo root
 - `data_processing.py` looks for the non-existent `scaling_params_lite.json` (correct: `scaling_parameters_lite.json`) — never run that file.
 - `train.py` has stale `n_forcing_vars=12` (correct post-split: **22** — 5 GHG + 15 aerosol-split + 2 seasonal).
 - Notebook defaults `DATA_VERSION='full'` + an organizer-internal `data_path` — the adapted copy is `notebooks/playground_lite.ipynb`.
+- **Stationarization reversal is broken upstream**: `_stationarize_single_scenario` broadcasts the raw monthly climatology and `evaluate()` collapses it with `isel(month=0)` — January's climatology added to every day (~2 K annual bias, summer ~15–20 K cold). Fixed by monkeypatch in `src/climx_project/compat.py` (`_patch_stationarize_reverse`); the round-trip test (anomalies → reversal → raw fields) must stay at ~1e-5 K bias.
 
 ## Validation conventions & expectations
 
