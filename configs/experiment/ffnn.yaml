@@ -17,5 +17,8 @@ model:
     separate_output_heads: true
 trainer:
   max_epochs: 5
-  pixel_batch: 4096
   num_workers: 0
+  # NOTE: 'pixel_batch' cannot be set here — NNBaseline.fit reads it for its
+  # datasets but fails to pop it before pl.Trainer(**params) (starter bug).
+  # The 4096 default exceeds the lite grid's 216 pixels, so it is a no-op
+  # on lite anyway.
