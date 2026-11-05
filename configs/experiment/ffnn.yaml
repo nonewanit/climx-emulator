@@ -22,3 +22,18 @@ trainer:
   # datasets but fails to pop it before pl.Trainer(**params) (starter bug).
   # The 4096 default exceeds the lite grid's 216 pixels, so it is a no-op
   # on lite anyway.
+
+# W&B monitoring (see src/climx_project/monitoring.py).
+# No WANDB_API_KEY -> runs offline automatically (local wandb/ dir, sync later
+# with `wandb sync wandb/`). With an account: `wandb login`, then runs appear
+# under the project below.
+logger:
+  backend: wandb
+  project: climx-lite
+  name: ffnn
+
+# Smoke runs (e.g. `python train.py experiment=ffnn experiment.trainer.max_epochs=1
+# experiment.record=false experiment.model_dir=results/models/ffnn_smoke`) skip
+# submission + score writes so real artifacts are never clobbered.
+record: true
+model_dir: null   # null -> results/models/ffnn (runner default)
