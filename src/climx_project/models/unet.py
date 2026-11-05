@@ -134,6 +134,8 @@ class UNetEmulator(Emulator):
         self.feature_vars = list(X_train.data_vars)
         self.target_vars = list(y_train.data_vars)
 
+        tp = dict(trainer_params or {})
+
         # Same split convention as the starter's NN (projections only, all
         # scenarios); val starts at 2081 to avoid the starter's overlapping
         # 2080 year.
@@ -141,6 +143,16 @@ class UNetEmulator(Emulator):
         y_tr = y_train.sel(time=slice("2015-01-01", "2080-12-31"))
         X_val = X_train.sel(time=slice("2081-01-01", "2100-12-31"))
         y_val = y_train.sel(time=slice("2081-01-01", "2100-12-31"))
+
+        # Local smoke runs: cap the number of days BEFORE materializing the
+        # arrays (this machine has 7.5 GB — a full load destabilizes WSL).
+        max_days = int(tp.get("max_days", 0) or 0)
+        if max_days > 0:
+            logger.info("max_days=%d: using a reduced smoke split", max_days)
+            X_tr = X_tr.isel(time=slice(0, max_days))
+            y_tr = y_tr.isel(time=slice(0, max_days))
+            X_val = X_val.isel(time=slice(0, max_days))
+            y_val = y_val.isel(time=slice(0, max_days))
 
         def to_numpy(X_ds):
             stacked = X_ds.stack(sample=("forcing_scenario", "time"))
@@ -156,7 +168,6 @@ class UNetEmulator(Emulator):
         y_val = to_numpy(y_val)
         logger.info("train %s, val %s", x_tr.shape, x_val.shape)
 
-        tp = dict(trainer_params or {})
         train_dl = DataLoader(_ArrayDataset(x_tr, y_tr),
                               batch_size=int(tp.get("batch_size", 64)),
                               shuffle=True,
