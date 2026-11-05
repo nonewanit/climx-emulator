@@ -65,20 +65,24 @@ python -m climx_project.submission submit results/submissions/submission_ffnn.pa
 # then add the leaderboard score to results/scores.md (kaggle LB column)
 ```
 
-## Monitoring runs (W&B)
+## Monitoring runs
 
-The FFNN experiment logs loss curves to **Weights & Biases** (Lightning's
-`WandbLogger`). Two modes:
+The FFNN experiment logs loss curves through Lightning, with two backends behind
+one config switch (`configs/experiment/ffnn.yaml` → `logger.backend`):
 
-- **With an account** (recommended): `wandb login`, then every run appears
-  under the project `climx-lite` on wandb.ai — train/val loss per epoch plus
-  the final local nNSE.
-- **Without an account**: runs go offline automatically and land in
-  `results/runs/wandb/`; sync them later with `wandb sync results/runs/wandb`.
+- **`tensorboard` (default) — local browser dashboard, no account, no network:**
+  ```bash
+  tensorboard --logdir results/runs/tensorboard     # then open http://localhost:6006
+  ```
+  Shows train/val loss curves, hyperparameters, and the final local nNSE per run.
+- **`wandb` — cloud dashboard** (nice when your network can reach wandb.ai):
+  `wandb login`, then runs appear under the project `climx-lite`. Without an
+  account (or from a blocked network) it auto-falls-back to offline mode — runs
+  land in `results/runs/wandb/` and can be synced later with
+  `wandb sync results/runs/wandb`.
+- `logger.backend: none` disables monitoring.
 
-Config lives in `configs/experiment/ffnn.yaml` under `logger:` (backend, project,
-name, offline). Set `logger.backend: none` to disable. The builder is shared:
-[`src/climx_project/monitoring.py`](src/climx_project/monitoring.py).
+The builder is shared: [`src/climx_project/monitoring.py`](src/climx_project/monitoring.py).
 
 **Smoke runs** (don't clobber real artifacts):
 ```bash

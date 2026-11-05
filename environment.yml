@@ -50,3 +50,4 @@ dependencies:
       - hydra-core==1.3.2
       - kaggle
       - wandb
+      - tensorboard

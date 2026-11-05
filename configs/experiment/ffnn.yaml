@@ -23,12 +23,15 @@ trainer:
   # The 4096 default exceeds the lite grid's 216 pixels, so it is a no-op
   # on lite anyway.
 
-# W&B monitoring (see src/climx_project/monitoring.py).
-# No WANDB_API_KEY -> runs offline automatically (local wandb/ dir, sync later
-# with `wandb sync wandb/`). With an account: `wandb login`, then runs appear
-# under the project below.
+# Experiment monitoring (see src/climx_project/monitoring.py).
+#   backend: wandb        -> cloud dashboard; auto-offline without WANDB_API_KEY
+#                            (runs land in results/runs/wandb/, sync later)
+#   backend: tensorboard  -> LOCAL browser dashboard, no network needed:
+#                            tensorboard --logdir results/runs/tensorboard
+#                            then open http://localhost:6006
+#   backend: none         -> disable
 logger:
-  backend: wandb
+  backend: tensorboard
   project: climx-lite
   name: ffnn
 
