@@ -1,0 +1,4 @@
+# Lite dataset settings (16x-coarsened 12x18 grid, ~800 MB).
+version: lite
+raw_chunks: auto   # xarray chunks for the raw open_mfdataset (lazy)
+target_variables: [huss, pr, psl, sfcWind, tas, tasmax, tasmin]

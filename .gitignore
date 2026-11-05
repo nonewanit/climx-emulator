@@ -1,12 +1,14 @@
 # Data and artifacts (downloaded datasets, preprocessing outputs, model checkpoints)
-data/
-results/runs/
-results/predictions/
-results/indices/
-results/models/
-results/submissions/
-outputs/
-lightning_logs/
+# NOTE: anchor to the repo ROOT — an unanchored `data/` also ignores
+# configs/data/ (cost us a missing Hydra config on the GitHub clone).
+/data/
+/results/runs/
+/results/predictions/
+/results/indices/
+/results/models/
+/results/submissions/
+/outputs/
+/lightning_logs/
 
 # Python
 __pycache__/
@@ -18,7 +20,7 @@ venv/
 .ipynb_checkpoints/
 
 # W&B (defense in depth: normal runs write under results/runs/wandb/)
-wandb/
+/wandb/
 
 # Editor/OS
 .DS_Store
