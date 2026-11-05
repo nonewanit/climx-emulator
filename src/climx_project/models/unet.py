@@ -176,8 +176,10 @@ class UNetEmulator(Emulator):
         from pytorch_lightning.callbacks import ModelCheckpoint
         callbacks = trainer_kwargs.get("callbacks", [])
         callbacks.append(ModelCheckpoint(
-            monitor="val_loss_epoch", mode="min", save_top_k=1, save_last=True,
-            dirpath=str(model_path), filename="best-{epoch:02d}-{val_loss_epoch:.4f}",
+            # val_loss is logged with on_step=False, on_epoch=True -> the key
+            # itself holds the epoch aggregate (no "_epoch" suffix for val).
+            monitor="val_loss", mode="min", save_top_k=1, save_last=True,
+            dirpath=str(model_path), filename="best-{epoch:02d}-{val_loss:.4f}",
         ))
         trainer_kwargs["callbacks"] = callbacks
 
