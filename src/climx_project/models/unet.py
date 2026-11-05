@@ -216,9 +216,12 @@ class UNetEmulator(Emulator):
         n_time = X.sizes["time"]
         for t0 in range(0, n_time, time_chunk):
             t1 = min(n_time, t0 + time_chunk)
+            # (feature, time, lat, lon) -> (time, feature, lat, lon): each day
+            # is one batch element for the conv net.
             xb = (X.isel(time=slice(t0, t1)).to_array(dim="feature")
                   .transpose("feature", "time", "lat", "lon")
                   .values.astype(np.float32))
+            xb = xb.transpose(1, 0, 2, 3)
             with torch.no_grad():
                 pred = self.model(torch.from_numpy(xb).to(device)).cpu().numpy()
             tcoord = X["time"].isel(time=slice(t0, t1))
