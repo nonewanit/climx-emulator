@@ -21,9 +21,9 @@ trainer:
   batch_size: 64
   num_workers: 2     # Kaggle GPU: 2; local CPU smoke: override to 0
   accelerator: auto  # picks the GPU on Kaggle/Colab, CPU locally
-  # max_days: 0      # >0 = train on the first N days per scenario only.
-  #                  # Use for LOCAL smoke runs — the full arrays (~1.8 GB)
-  #                  # destabilize this 7.5 GB WSL machine.
+  max_days: 0        # >0 = train on the first N days per scenario only.
+                     # Use for LOCAL smoke runs — the full arrays (~1.8 GB)
+                     # destabilize this 7.5 GB WSL machine.
 
 logger:
   backend: tensorboard
