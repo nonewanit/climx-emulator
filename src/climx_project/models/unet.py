@@ -178,7 +178,8 @@ class UNetEmulator(Emulator):
                             num_workers=int(tp.get("num_workers", 0)))
 
         trainer_kwargs = {k: v for k, v in tp.items()
-                          if k not in ("batch_size", "num_workers", "model_path")}
+                          if k not in ("batch_size", "num_workers",
+                                       "model_path", "max_days")}
         trainer_kwargs.setdefault("logger", False)
         model_path = Path(tp.get("model_path", "results/models/unet"))
         model_path.mkdir(parents=True, exist_ok=True)
