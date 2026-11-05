@@ -205,11 +205,13 @@ def open_datasets(chunks: object = "auto") -> object:
 
     Returns the starter's ClimXVirtualDatasets dataclass with attributes
     .hist / .train / .test_forcings (lazily loaded xarray datasets).
+    Honors the CLIMX_LITE_DIR override (e.g. a Kaggle input mount).
     """
     from src.utils.hugging_face_utils import open_climx_virtual_datasets
 
     check_lite_files()
-    return open_climx_virtual_datasets(paths.DATA_DIR, "lite", parallel=True, chunks=chunks)
+    return open_climx_virtual_datasets(
+        paths.LITE_DIR.parent, paths.LITE_DIR.name, parallel=True, chunks=chunks)
 
 
 def main(argv: list[str] | None = None) -> None:

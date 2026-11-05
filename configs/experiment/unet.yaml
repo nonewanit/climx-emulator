@@ -1,0 +1,30 @@
+# U-Net emulator (Phase B main model). Encoder-decoder conv net mapping the 22
+# forcing channels to the 7 target fields (scaled anomalies), same interface as
+# the baselines. pad_to pads the 12x18 lite grid to 16x32 for clean 4x
+# downsampling; on the full grid use [192, 288].
+name: unet
+runner:
+  _target_: climx_project.runners.unet.run
+seed: 42
+model:
+  _target_: climx_project.models.unet.UNetEmulator
+  model_params:
+    n_in: 22
+    n_out: 7
+    base_channels: 64
+    learning_rate: 0.001
+    # huss, pr, psl, sfcWind, tas, tasmax, tasmin — indices use tas*/pr
+    variable_weights: [1.0, 1.5, 0.5, 0.5, 1.5, 1.5, 1.5]
+    pad_to: [16, 32]
+trainer:
+  max_epochs: 5
+  batch_size: 64
+  num_workers: 2     # Kaggle GPU: 2; local CPU smoke: override to 0
+  accelerator: auto  # picks the GPU on Kaggle/Colab, CPU locally
+
+logger:
+  backend: tensorboard
+  name: unet
+
+record: true
+model_dir: null   # null -> results/models/unet (runner default)

@@ -3,16 +3,26 @@
 Every path is __file__-relative on purpose: Hydra changes the process cwd to
 its run dir, so any cwd-relative path would silently break. Nothing in this
 repo may build paths from os.getcwd().
+
+Env overrides for notebook environments (Kaggle/Colab):
+  CLIMX_DATA_DIR         root for downloads/raw (default: <repo>/data)
+  CLIMX_LITE_DIR         where the 6 lite .nc files live (default: data/lite);
+                         point at /kaggle/input/climx-main-track to avoid
+                         copying the 800 MB bundle
+  CLIMX_PREPROCESS_DIR   where preprocessing outputs land (default:
+                         data/preprocessing_data_lite)
 """
 
+import os
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-DATA_DIR = PROJECT_ROOT / "data"
+DATA_DIR = Path(os.environ.get("CLIMX_DATA_DIR", str(PROJECT_ROOT / "data")))
 RAW_DIR = DATA_DIR / "raw"
-LITE_DIR = DATA_DIR / "lite"
-PREPROCESSING_DIR = DATA_DIR / "preprocessing_data_lite"
+LITE_DIR = Path(os.environ.get("CLIMX_LITE_DIR", str(DATA_DIR / "lite")))
+PREPROCESSING_DIR = Path(os.environ.get(
+    "CLIMX_PREPROCESS_DIR", str(DATA_DIR / "preprocessing_data_lite")))
 
 RESULTS_DIR = PROJECT_ROOT / "results"
 RUNS_DIR = RESULTS_DIR / "runs"
