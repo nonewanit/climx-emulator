@@ -1,92 +1,142 @@
-# ClimX — course project pipeline (Tsinghua ML 80245013, Fall 2026)
+# ClimX — Extreme-Aware Emulation of NorESM2-MM
 
-Code for the [ClimX](https://www.kaggle.com/competitions/climx-main-track) Kaggle
-competition: extreme-aware emulation of the NorESM2-MM Earth System Model.
-Proposal lives next door in [`../proposal/`](../proposal/). Kaggle closes
-**Dec 15, 2026** (treat **Nov 30** as the safe final-submission target).
+Course project for Tsinghua ML 80245013 (Fall 2026): join the
+[ClimX](https://www.kaggle.com/competitions/climx-main-track) Kaggle competition
+and build a fast ML emulator of the NorESM2-MM Earth System Model. The emulator
+maps climate **forcings** (CO₂, aerosols) to **daily climate fields**; the
+leaderboard scores how well the predicted fields reproduce 15 extreme-climate
+indices (heatwaves, droughts, …) on a held-out future scenario (SSP2-4.5).
 
-## Layout — how "many approaches" are organized
+- Proposal + background reading: [`../proposal/`](../proposal/)
+- Kaggle closes **Dec 15, 2026** — treat **Nov 30** as the safe final-submission target
+- Mid-term report ~Nov 15, poster week 15, final report + code ~Jan 8, 2027
 
-- `train.py` — the **single entry point**. An approach is chosen by config:
-  `python train.py experiment=<name>`.
-- `configs/` — one YAML per approach (`configs/experiment/*.yaml`), composed by
-  Hydra with shared defaults in `configs/config.yaml` + `configs/data/lite.yaml`.
-  CLI overrides work anywhere: `python train.py experiment=ffnn experiment.trainer.max_epochs=1`.
-- `src/climx_project/` — shared plumbing, written **once** and reused by every
-  approach: data download/mapping, preprocessing wrappers, the local validation
-  harness (official `rnNSE.py` scorer), submission parquet builder/verifier.
-  `src/climx_project/runners/` holds the thin per-model fit glue; everything
-  after fit is shared in `runners/base.py`.
-- `third_party/climx/` — vendored snapshot of the organizers' starter kit
-  ([IPL-UV/ClimX](https://github.com/IPL-UV/ClimX) @ `21e6502`). **Read-only** —
-  never edit; a needed patch gets documented here instead.
-- `data/`, `results/` — gitignored artifacts. `results/scores.md` is the
-  tracked score log (the mid-term report's data source).
+## Current results (week 7–9 milestone)
 
-**Adding the week-10 U-Net** = create `configs/experiment/unet.yaml` +
-`src/climx_project/runners/unet.py` (copy `runners/ffnn.py`). Nothing else changes.
+Local nNSE on our SSP3-7.0 2081–2100 holdout, scored with the official metric:
 
-## Setup
+| Model | Local nNSE | Organizer full-grid reference |
+|---|---|---|
+| climatology | −0.6460 | −0.5653 |
+| LPS | −0.4409 | −0.4487 |
+| FFNN | **−0.4247** | −0.4664 |
+
+Every run appends to [`results/scores.md`](results/scores.md) (the tracked score log).
+nNSE ∈ (−1, 1]: 1 = perfect, 0 = "predict the mean", negative = worse than that.
+
+## Quickstart (from zero to a score)
 
 ```bash
-mamba env create -f environment.yml     # env name: climx (CPU-only, aarch64-safe)
+# 1. One-time: install Miniforge (https://github.com/conda-forge/miniforge) and
+#    clone the repo, then create the environment (~10 min):
+git clone <repo-url> && cd climx
+mamba env create -f environment.yml
 conda activate climx
-pip install -e .                       # installs ONLY climx_project
+pip install -e .
 ```
-
-Import rule: every script starts with `import climx_project` — that is the one
-place the vendored starter kit gets put on `sys.path` (its code mixes relative
-and `from src...` imports, so its root must be importable as a top-level
-`src` package). Run scripts from the repo root; never `cd third_party/climx`.
-
-## Manual Kaggle steps (one-time, before the first submission)
-
-1. Every member: Kaggle account + accept the rules at
-   https://www.kaggle.com/competitions/climx-main-track/rules
-2. One member: create an API key (Account → Settings → Create New API Token),
-   save it as `~/.kaggle/kaggle.json` (`chmod 600`).
-3. One member creates the team; everyone joins **before the first submission**
-   (merging teams later discards one team's submission history).
-
-## Pipeline
 
 ```bash
-make data          # download the Kaggle bundle + map it into data/lite/ (~800 MB)
-make preprocess    # climatology + scaling params + X_train/y_train/X_test (.nc)
-make climatology   # baseline 1 (also runs the ~1.0 scoring self-check)
-make lps           # baseline 2
-make ffnn          # baseline 3 (5 Lightning epochs, ~30-90 min CPU)
-make verify FILE=results/submissions/submission_ffnn.parquet
-make submit FILE=results/submissions/submission_ffnn.parquet MSG="FFNN baseline, lite"
+# 2. One-time, every team member: Kaggle account + accept the competition rules
+#    (https://www.kaggle.com/competitions/climx-main-track/rules). ONE member
+#    also creates an API key (Account → Settings → Create New API Token) saved as
+#    ~/.kaggle/kaggle.json (chmod 600), and creates the team — everyone joins
+#    BEFORE the first submission (merging teams later wipes submission history).
 ```
 
-Each run writes its predictions (zarr), indices (.nc), submission parquet, and a
-row in `results/scores.md` (local nNSE on the SSP3-7.0 2081–2100 holdout).
-Expected local-score band: −0.3 … −0.7, with climatology the worst.
+```bash
+# 3. Download the lite data (~800 MB) and preprocess it (~10–30 min CPU):
+make data
+make preprocess
+```
+
+```bash
+# 4. Run an experiment (each ends with a local nNSE + submission parquet):
+python train.py experiment=climatology    # ~10 min
+python train.py experiment=lps            # ~10 min
+python train.py experiment=ffnn           # ~30–90 min (5 Lightning epochs, CPU)
+# any config value is overridable on the CLI:
+python train.py experiment=ffnn experiment.trainer.max_epochs=10
+```
+
+```bash
+# 5. Verify and submit (needs the Kaggle API key from step 2):
+python -m climx_project.submission verify results/submissions/submission_ffnn.parquet
+python -m climx_project.submission submit results/submissions/submission_ffnn.parquet "FFNN baseline"
+# then add the leaderboard score to results/scores.md (kaggle LB column)
+```
+
+## Monitoring runs (W&B)
+
+The FFNN experiment logs loss curves to **Weights & Biases** (Lightning's
+`WandbLogger`). Two modes:
+
+- **With an account** (recommended): `wandb login`, then every run appears
+  under the project `climx-lite` on wandb.ai — train/val loss per epoch plus
+  the final local nNSE.
+- **Without an account**: runs go offline automatically and land in
+  `results/runs/wandb/`; sync them later with `wandb sync results/runs/wandb`.
+
+Config lives in `configs/experiment/ffnn.yaml` under `logger:` (backend, project,
+name, offline). Set `logger.backend: none` to disable. The builder is shared:
+[`src/climx_project/monitoring.py`](src/climx_project/monitoring.py).
+
+**Smoke runs** (don't clobber real artifacts):
+```bash
+python train.py experiment=ffnn experiment.trainer.max_epochs=1 \
+  experiment.record=false experiment.model_dir=results/models/ffnn_smoke
+```
+
+## Adding a new approach (weeks 10+: U-Net, ConvLSTM, ensembles)
+
+The repo is organized so a new model = **two new files, nothing else**:
+
+1. `configs/experiment/<name>.yaml` — model hyperparams, trainer settings,
+   optional `logger:` block. Copy `ffnn.yaml`.
+2. `src/climx_project/runners/<name>.py` — construct the model, fit it, then
+   call `base.run_experiment(...)`. Copy `runners/ffnn.py`.
+
+Run it with `python train.py experiment=<name>`. Data loading, preprocessing,
+holdout validation (official scorer), submission building, and score logging
+are all shared — you never touch them.
+
+## Repo layout
+
+```
+train.py                 # single Hydra entry point: python train.py experiment=<name>
+configs/                 # one YAML per approach (+ shared data/defaults)
+src/climx_project/       # shared plumbing: data, preprocess, validation (official
+                         #   rnNSE scorer), submission, W&B monitoring, runners/
+third_party/climx/       # vendored organizers' starter kit @ 21e6502 (read-only;
+                         #   bug fixes live in src/climx_project/compat.py)
+notebooks/               # exploration (playground_lite.ipynb)
+data/                    # gitignored: downloads + preprocessing outputs
+results/                 # gitignored artifacts + TRACKED scores.md
+reports/                 # mid-term / final report drafts (professor deliverables)
+```
 
 ## Local validation mirrors the leaderboard
 
-The official scorer `third_party/climx/rnNSE.py` embeds the AR6 region mask and
-the 192×288 grid — no external files. We hold out SSP3-7.0 2081–2100 (real
-targets), compute GT indices from the raw daily fields with the official index
-code, upscale both sides 12×18 → 192×288 (nearest + edge extrapolation — the
-edge NaNs would otherwise invalidate the submission), and score with
-`rnNSE.score()`. Organizer reference scores on the full test set: climatology
-−0.5653, LPS −0.4487, FFNN −0.4664.
+The official scorer (`third_party/climx/rnNSE.py`) embeds the AR6 land-region
+mask and the 192×288 grid. We hold out the last 20 years of a training scenario
+(SSP3-7.0, 2081–2100 — the test scenario has no released targets), compute the
+ground-truth indices from the raw daily fields with the official index code,
+upscale predictions 12×18 → 192×288 (nearest + edge extrapolation), and score
+with `rnNSE.score()`. The climatology run also performs a **self-check** that
+must equal ~1.0 — it proves the scoring plumbing is correct.
 
-## Data routes
+## Troubleshooting
 
-- Primary: Kaggle CLI (`make data`) — needs the API key above.
-- Fallback: `python -m climx_project.data download-hf` (downloads `lite/` from
-  the Hugging Face mirror `hf-mirror.com`; huggingface.co is blocked on this
-  network, as is github.com).
+- **github.com / huggingface.co blocked** (network restrictions): clone via
+  `https://ghfast.top/https://github.com/...`; datasets via
+  `python -m climx_project.data download-hf` (hf-mirror.com, `curl -4`).
+- **`HDF5` / dask hangs**: already handled globally by
+  `src/climx_project/__init__.py` (single-threaded dask, HDF5 file locking off).
+- **NaN in a submission parquet**: our pipeline refuses to write it (the
+  starter's writer would silently zero-fill). Fix the source, don't bypass.
+- More detail for contributors: [CLAUDE.md](CLAUDE.md).
 
-## Known starter-kit bugs we work around
+## License
 
-- `data_processing.py` looks for `scaling_params_lite.json`; the correct file is
-  `scaling_parameters_lite.json` (preprocessing writes it). Never run
-  `data_processing.py` verbatim.
-- `train.py` has stale `n_forcing_vars=12`; the real value after the aerosol
-  triple-split is 22 (set in `configs/experiment/ffnn.yaml`).
-- The starter's parquet writer silently zero-fills NaNs — our submission module
-  refuses to write instead.
+MIT — see [LICENSE](LICENSE). The vendored starter kit in `third_party/climx/`
+keeps its own MIT license (IPL). Open-sourcing code + weights (MIT/Apache-2.0)
+is also a competition requirement for prize eligibility.

@@ -17,6 +17,9 @@ venv/
 *.egg-info/
 .ipynb_checkpoints/
 
+# W&B (defense in depth: normal runs write under results/runs/wandb/)
+wandb/
+
 # Editor/OS
 .DS_Store
 .vscode/

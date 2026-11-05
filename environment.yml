@@ -49,3 +49,4 @@ dependencies:
       - huggingface_hub
       - hydra-core==1.3.2
       - kaggle
+      - wandb
