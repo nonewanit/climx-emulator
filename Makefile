@@ -31,3 +31,8 @@ verify:
 # make submit FILE=results/submissions/submission_ffnn.parquet MSG="FFNN baseline"
 submit:
 	@python -m climx_project.submission submit $(FILE) "$(MSG)"
+
+# Copy local TensorBoard logs into the tracked monitoring/ dir for teammates.
+sync-tb:
+	@rsync -a --delete results/runs/tensorboard/ monitoring/tensorboard/ 2>/dev/null || cp -r results/runs/tensorboard/* monitoring/tensorboard/
+	@echo "synced -> monitoring/tensorboard/ (commit + push to share)"
