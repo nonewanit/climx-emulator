@@ -24,9 +24,9 @@ Local holdout = SSP3-7.0, 2081–2100 (20 years), scored with the official metri
 
 | Model | Local nNSE (holdout) | Kaggle LB | Organizer full-grid reference |
 |---|---|---|---|
-| climatology | −0.6460 | *(pending)* | −0.5653 |
-| LPS | −0.4409 | *(pending)* | −0.4487 |
-| FFNN | −0.4247 | *(pending)* | −0.4664 |
+| climatology | −0.6460 | *(pending — submit when quota allows)* | −0.5653 |
+| LPS | −0.4409 | **−0.54241** | −0.4487 |
+| FFNN | −0.4247 | **−0.55664** | −0.4664 |
 
 - Self-check: climatology-vs-itself nNSE = **1.0** (scoring plumbing verified).
 - Ordering matches the organizers' references; our LPS lands within 0.01 of their full-grid score.
