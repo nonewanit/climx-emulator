@@ -13,6 +13,7 @@ Env overrides for notebook environments (Kaggle/Colab):
                          data/preprocessing_data_lite)
 """
 
+import logging
 import os
 from pathlib import Path
 
@@ -44,8 +45,19 @@ X_TEST_NC = PREPROCESSING_DIR / "X_test.nc"
 
 
 def ensure_dirs() -> None:
-    """Create the artifact directories that must exist before a run."""
+    """Create the artifact directories that must exist before a run.
+
+    Tolerates read-only external mounts (e.g. CLIMX_LITE_DIR pointing at
+    Kaggle's /kaggle/input, where mkdir raises OSError EROFS rather than
+    FileExistsError).
+    """
     for d in (RAW_DIR, LITE_DIR, PREPROCESSING_DIR, RUNS_DIR, PREDICTIONS_DIR,
               INDICES_DIR, MODELS_DIR, SUBMISSIONS_DIR):
-        d.mkdir(parents=True, exist_ok=True)
+        try:
+            d.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            if not d.exists():
+                raise
+            logging.getLogger(__name__).info(
+                "ensure_dirs: %s exists but is not writable (%s) — skipping", d, e)
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
