@@ -19,10 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-The vendored organizers' starter kit in `third_party/climx/` is Copyright (c)
-2026 Image Processing Lab (IPL) and carries its own MIT license
-(`third_party/climx/LICENSE`). The AR6 land-region mask embedded in
-`third_party/climx/rnNSE.py` is part of that snapshot.
