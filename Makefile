@@ -46,5 +46,6 @@ kaggle-status:
 
 kaggle-pull:
 	@mkdir -p results/kaggle
-	@kaggle kernels output -p results/kaggle nonewanitchollakit/climx-unet-headless
-	@echo "downloaded -> results/kaggle (scores.md, tb-logs.zip, submission parquet)"
+	@kaggle kernels output -p results/kaggle nonewanitchollakit/climx-unet-headless --file-pattern '^outputs/'
+	@echo "downloaded -> results/kaggle/outputs (scores.md, tb-logs.zip, submission parquet)"
+	@echo "NOTE: --file-pattern grabs only the outputs/ dir — no data/, no repo clone."

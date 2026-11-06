@@ -19,7 +19,9 @@ kaggle kernels push -p .          # needs YOUR Kaggle API key in ~/.kaggle/kaggl
 4. Watch progress:
    - `kaggle kernels status nonewanitchollakit/climx-unet-headless`
    - or the notebook page (you can open it from Kaggle → your notebooks).
-5. When complete: `kaggle kernels output -p results/kaggle nonewanitchollakit/climx-unet-headless`
+5. When complete, pull ONLY the outputs (seconds, not 20 minutes — the
+   `--file-pattern` skips the bulky data/ and the repo clone):
+   `kaggle kernels output -p results/kaggle nonewanitchollakit/climx-unet-headless --file-pattern '^outputs/'`
    → `results/kaggle/outputs/scores.md` has the new row; copy it into the
    repo's `results/scores.md` (new row, don't overwrite), commit, push.
 6. The submission parquet is in `results/kaggle/outputs/` — the Kaggle
