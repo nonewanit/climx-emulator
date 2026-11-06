@@ -36,3 +36,15 @@ submit:
 sync-tb:
 	@rsync -a --delete results/runs/tensorboard/ monitoring/tensorboard/ 2>/dev/null || cp -r results/runs/tensorboard/* monitoring/tensorboard/
 	@echo "synced -> monitoring/tensorboard/ (commit + push to share)"
+
+# Headless Kaggle GPU runs (launch from this terminal, no browser).
+kaggle-push:
+	@cd kaggle-headless && kaggle kernels push -p .
+
+kaggle-status:
+	@kaggle kernels status nonewanitchollakit/climx-unet-headless
+
+kaggle-pull:
+	@mkdir -p results/kaggle
+	@kaggle kernels output -p results/kaggle nonewanitchollakit/climx-unet-headless
+	@echo "downloaded -> results/kaggle (scores.md, tb-logs.zip, submission parquet)"
