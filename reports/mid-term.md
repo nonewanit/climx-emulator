@@ -24,9 +24,14 @@ Local holdout = SSP3-7.0, 2081–2100 (20 years), scored with the official metri
 
 | Model | Local nNSE (holdout) | Kaggle LB | Organizer full-grid reference |
 |---|---|---|---|
-| climatology | −0.6460 | *(pending — submit when quota allows)* | −0.5653 |
+| climatology | −0.6460 | **−0.61699** | −0.5653 |
 | LPS | −0.4409 | **−0.54241** | −0.4487 |
 | FFNN | −0.4247 | **−0.55664** | −0.4664 |
+| U-Net (lite) | −0.4380 | **−0.54374** | — |
+
+Leaderboard ordering (LPS ≈ U-Net > FFNN > climatology) shows the conv model
+generalizes to the unseen SSP2-4.5 scenario better than the per-pixel MLP; LPS's
+linear CO₂ scaling remains the strongest extrapolator on lite data.
 
 - Self-check: climatology-vs-itself nNSE = **1.0** (scoring plumbing verified).
 - Ordering matches the organizers' references; our LPS lands within 0.01 of their full-grid score.
