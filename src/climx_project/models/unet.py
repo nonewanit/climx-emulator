@@ -179,19 +179,27 @@ class UNetEmulator(Emulator):
 
         trainer_kwargs = {k: v for k, v in tp.items()
                           if k not in ("batch_size", "num_workers",
-                                       "model_path", "max_days")}
+                                       "model_path", "max_days",
+                                       "early_stop_patience")}
         trainer_kwargs.setdefault("logger", False)
         model_path = Path(tp.get("model_path", "results/models/unet"))
         model_path.mkdir(parents=True, exist_ok=True)
         trainer_kwargs.setdefault("default_root_dir", str(model_path))
 
-        from pytorch_lightning.callbacks import ModelCheckpoint
+        from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
         callbacks = trainer_kwargs.get("callbacks", [])
         callbacks.append(ModelCheckpoint(
             # val_loss is logged with on_step=False, on_epoch=True -> the key
             # itself holds the epoch aggregate (no "_epoch" suffix for val).
             monitor="val_loss", mode="min", save_top_k=1, save_last=True,
             dirpath=str(model_path), filename="best-{epoch:02d}-{val_loss:.4f}",
+        ))
+        # Self-regulating long runs: stop when validation loss plateaus, so
+        # max_epochs can be set generously without wasting GPU time.
+        callbacks.append(EarlyStopping(
+            monitor="val_loss", mode="min",
+            patience=int(tp.get("early_stop_patience", 3)), min_delta=1e-4,
+            verbose=True,
         ))
         trainer_kwargs["callbacks"] = callbacks
 

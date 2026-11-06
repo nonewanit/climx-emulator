@@ -24,6 +24,8 @@ trainer:
   max_days: 0        # >0 = train on the first N days per scenario only.
                      # Use for LOCAL smoke runs — the full arrays (~1.8 GB)
                      # destabilize this 7.5 GB WSL machine.
+  early_stop_patience: 3   # EarlyStopping on val_loss; raise max_epochs
+                           # freely — the run stops itself when it plateaus
 
 logger:
   backend: tensorboard
