@@ -41,16 +41,15 @@ python train.py experiment=unet   # or climatology / lps / ffnn
   `monitoring/tensorboard/`), commit, push — teammates view with
   `tensorboard --logdir monitoring/tensorboard`.
 
-## Suggested division of labor
+## Division of labor (agreed Nov 7)
 
-| Who | Lead role | Backup |
-|---|---|---|
-| None | Repo/CI, Kaggle orchestration, baseline maintenance | everyone |
-| Nattapol | Mid-term + final report writing | None |
-| Charoonroj | Full-grid U-Net on Colab (weeks 11–12), world-model phase C | None |
+| Who | Role |
+|---|---|
+| **Nattapol + Charoonroj** | **Experiment runners**: techniques + hyperparameter tuning on Kaggle's GPU, following [`docs/EXPERIMENTS.md`](EXPERIMENTS.md). No report writing, no code changes — if a knob is missing, ask None to add it. |
+| **None (+ Claude Code)** | Reports (mid-term + final), the repo, and the core training from the proposal (U-Net main model, world-model phase C, ensembles). |
 
-Everyone runs at least one experiment start-to-finish so all three can
-defend every number in the report.
+Runners own the "try it and record it" loop; None owns the "make it possible"
+loop. Every number in the report must be reproducible by the person who ran it.
 
 ## Score log etiquette (`results/scores.md`)
 

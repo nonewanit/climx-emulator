@@ -1,0 +1,9 @@
+{
+  "_comment": "Edit these overrides, then `kaggle kernels push -p kaggle-headless`. Every key is a Hydra override appended to `experiment=unet`. Keep `experiment.record=true` unless it is a smoke test.",
+  "train_args": [
+    "experiment=unet",
+    "experiment.trainer.max_epochs=20",
+    "experiment.seed=42",
+    "experiment.record=true"
+  ]
+}
