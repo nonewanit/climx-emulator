@@ -206,6 +206,13 @@ class UNetEmulator(Emulator):
         self.trainer = pl.Trainer(**trainer_kwargs)
         self.trainer.fit(self.model, train_dl, val_dl)
 
+        # Evaluate with the BEST-val weights, not the last epoch's — val loss
+        # fluctuates at this scale and last != best.
+        best = getattr(self.trainer.checkpoint_callback, "best_model_path", None)
+        if best:
+            self.model = UNetModule.load_from_checkpoint(best)
+            logger.info("Loaded best-val checkpoint for evaluation: %s", best)
+
     def predict(self, X, *, target_vars=None, time_chunk=512):
         self.model.eval()
         if target_vars is not None:
