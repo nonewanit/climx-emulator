@@ -25,9 +25,12 @@ os.environ.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
 # on this machine (observed: every thread parked in futex_do_wait during the
 # climatology write). The lite data is small (12x18 grids); the single-threaded
 # scheduler is deterministic, uses less memory, and costs nothing in practice.
+# On multi-core remote runners (Kaggle) the same deadlock is NOT guaranteed —
+# set CLIMX_DASK_SCHEDULER=threads there to use all cores (before importing
+# this package).
 import dask  # noqa: E402
 
-dask.config.set(scheduler="single-threaded")
+dask.config.set(scheduler=os.environ.get("CLIMX_DASK_SCHEDULER", "single-threaded"))
 
 _VENDOR = Path(__file__).resolve().parents[2] / "third_party" / "climx"
 if str(_VENDOR) not in sys.path:

@@ -156,15 +156,23 @@ class UNetEmulator(Emulator):
         X_val = X_train.sel(time=slice("2081-01-01", "2100-12-31"))
         y_val = y_train.sel(time=slice("2081-01-01", "2100-12-31"))
 
-        # Local smoke runs: cap the number of days BEFORE materializing the
-        # arrays (this machine has 7.5 GB — a full load destabilizes WSL).
+        # Smoke runs (max_days > 0) use time-slices that usually don't reach
+        # 2081-2100, so split by fraction of the available days instead of the
+        # absolute-date convention.
         max_days = int(tp.get("max_days", 0) or 0)
         if max_days > 0:
-            logger.info("max_days=%d: using a reduced smoke split", max_days)
+            n = int(X_train.sizes["time"])
+            cut = max(1, int(n * 0.8))
+            logger.info("smoke split: %d days total, train %d / val %d (max_days=%d)",
+                        n, cut, n - cut, max_days)
+            X_tr = X_train.isel(time=slice(0, cut))
+            y_tr = y_train.isel(time=slice(0, cut))
+            X_val = X_train.isel(time=slice(cut, None))
+            y_val = y_train.isel(time=slice(cut, None))
             X_tr = X_tr.isel(time=slice(0, max_days))
             y_tr = y_tr.isel(time=slice(0, max_days))
-            X_val = X_val.isel(time=slice(0, max_days))
-            y_val = y_val.isel(time=slice(0, max_days))
+            X_val = X_val.isel(time=slice(0, max(1, max_days // 4)))
+            y_val = y_val.isel(time=slice(0, max(1, max_days // 4)))
 
         def to_numpy(X_ds):
             stacked = X_ds.stack(sample=("forcing_scenario", "time"))
