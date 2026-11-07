@@ -28,19 +28,45 @@ kaggle kernels push -p .          # needs YOUR Kaggle API key in ~/.kaggle/kaggl
    leaderboard has a 2-submissions/day quota shared by the WHOLE TEAM:
    coordinate before submitting.
 
-## Current menu (pick one, mark it in the table below)
+## Current menu
 
-| # | What | params.json change | Why it matters |
-|---|---|---|---|
-| 1 | Longer training | `experiment.trainer.max_epochs=30` | Early stopping caps it; more epochs = better fit |
-| 2 | Capacity up | `experiment.model.model_params.base_channels=128` | Bigger U-Net, still small |
-| 3 | Capacity down | `...base_channels=32` | Overfitting check — if 32 ≈ 64, we're capacity-bound |
-| 4 | LR sweep | `experiment.model.model_params.learning_rate=0.0003` (and `0.003`) | 1e-3 may be suboptimal |
-| 5 | Batch size | `experiment.trainer.batch_size=32` (and `128`) | BN statistics + convergence speed |
-| 6 | Loss weights | `experiment.model.model_params.variable_weights='[1,2,0.5,0.5,2,2,2]'` | Emphasize the index-driving vars (tas*/pr) even more |
-| 7 | Seeds | `experiment.seed=7` (and `123`) | Ensemble material for Phase D |
+**STATUS (Nov 7): the lite grid is SATURATED.** Single-model hyperparameter
+sweeps on lite are dead GPU hours (5 epochs −0.4380 vs 20 epochs −0.4340
+local — the ceiling is the 216-pixel grid, not the training). The ONE lite
+activity still worth GPU time is **Phase D: seeds for the ensemble** — the
+rules allow an unweighted mean of index maps across realizations of the SAME
+emulator, which reliably beats any single seed on the LB.
 
-Baseline to beat: **U-Net local nNSE −0.4380 / LB −0.54374** (5 epochs, seed 42).
+### Ensemble run plan (3 runners, 3 pushes)
+
+1. Runner A: `params.json` with `"experiment.trainer.max_epochs": 5`, `"experiment.seed": 7`
+2. Runner B: same but `"experiment.seed": 123`
+3. Runner C: same but `"experiment.seed": 42` (re-run for a consistent trio)
+
+Same config except the seed — nothing else may differ (that's the
+"same emulator" rule). Each push's `outputs/submission_unet.parquet` gets
+pulled and renamed (`submission_unet_seed7.parquet`, ...). Then:
+
+```bash
+python scripts/ensemble_indices.py \
+  results/kaggle/outputs/submission_unet_seed7.parquet \
+  results/kaggle/outputs/submission_unet_seed42.parquet \
+  results/kaggle/outputs/submission_unet_seed123.parquet \
+  -o results/submissions/submission_ensemble.parquet
+```
+
+One ensemble parquet = one Kaggle submission slot (2/day team quota — coordinate!).
+
+### (Suspended) single-model lite sweeps — only if the ensemble fails to beat LPS
+
+| # | What | params.json change |
+|---|---|---|
+| 1 | Capacity up | `experiment.model.model_params.base_channels=128` |
+| 2 | LR sweep | `experiment.model.model_params.learning_rate=0.0003` (and `0.003`) |
+| 3 | Loss weights | `experiment.model.model_params.variable_weights='[1,2,0.5,0.5,2,2,2]'` |
+
+Baseline to beat: **U-Net local nNSE −0.4380 / LB −0.54374** (5 epochs, seed 42);
+LPS holds the top LB spot at −0.54241.
 
 ## Rules
 
