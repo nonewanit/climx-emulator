@@ -268,9 +268,12 @@ def open_full_datasets(*, hist_days: int | None = None, train_days: int | None =
     (each slice reads only the chunks it touches).
 
     Returns a namespace with .hist / .train / .test_forcings (lazily loaded).
-    Note for smoke runs: `hist` may be replaced by a train slice by the caller
-    (see scripts/fullres_smoke.py) to avoid reading the ~63 GB historical files
-    just to exercise the code path.
+    `hist` is a train alias: smoke runs avoid the ~63 GB historical files
+    entirely (the reversal's climatology path only needs the same layout).
+
+    Requires the SINGLE-THREADED dask scheduler (the package default) — the
+    threads scheduler races on the shared remote file handle (v5 symptom:
+    hours of tiny re-reads with no progress).
     """
     import fsspec  # noqa: F401 (fsspec registers the hf:// protocol deps)
     import xarray as xr
@@ -280,25 +283,29 @@ def open_full_datasets(*, hist_days: int | None = None, train_days: int | None =
 
     def open_one(suffix: str, n_days: int | None):
         url = f"{FULL_REPO}/{FULL_PREFIX}{suffix}.nc"
-        f = fs.open(url, "rb")
         # Time-chunking is ESSENTIAL for remote streaming: with chunks={} the
         # whole (multi-GB) variable is one dask chunk and every access pulls
         # the entire file over HTTP. ~1 year per chunk = ~80 MB per var/read.
+        # NOTE: the file object is shared across dask tasks — keep the dask
+        # scheduler SINGLE-THREADED (the package default; the threads
+        # scheduler races seeks on the shared HTTP handle, cf. v5's thrash).
+        f = fs.open(url, "rb")
         ds = xr.open_dataset(f, engine="h5netcdf", chunks=chunks or {"time": 365})
         if n_days:
             ds = ds.isel(time=slice(0, n_days))
         return ds
 
-    hist = xr.combine_by_coords(
-        [open_one("hist_train_1850_1931", hist_days),
-         open_one("hist_train_1932_2014", hist_days)],
-        combine_attrs="drop_conflicts")
-    train = xr.combine_by_coords(
+    # The scenario files share an IDENTICAL daily time axis (2015-2100) — they
+    # must be concatenated along a NEW forcing_scenario dimension (the
+    # starter's convention), never combine_by_coords (which would try to
+    # align the duplicate times). `hist` is a train alias: the smoke scripts
+    # only need it for the reversal's climatology path.
+    train = xr.concat(
         [open_one("train_ssp126", train_days), open_one("train_ssp370", train_days)],
-        combine_attrs="drop_conflicts")
+        dim="forcing_scenario", combine_attrs="drop_conflicts")
     test = open_one("test_forcings_ssp245", test_days)
 
-    return type("FullDatasets", (), {"hist": hist, "train": train, "test_forcings": test})()
+    return type("FullDatasets", (), {"hist": train, "train": train, "test_forcings": test})()
 
 
 def daily_forcings(ds: "xr.Dataset") -> "xr.Dataset":

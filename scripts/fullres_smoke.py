@@ -24,6 +24,10 @@ from climx_project.runners.base import set_seed
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("fullres_smoke")
+# The remote reads log every range request at INFO — thousands of URL lines
+# drown the stage markers. Keep the log readable in the notebook console.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("huggingface_hub").setLevel(logging.WARNING)
 
 os.environ.setdefault("CLIMX_PREPROCESS_DIR", "/kaggle/working/data/preprocessing_data_full_smoke")
 PREPROC_DIR = paths.PREPROCESSING_DIR
