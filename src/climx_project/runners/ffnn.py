@@ -11,8 +11,6 @@ Config extras this runner understands (all optional, in the experiment config):
 import logging
 from pathlib import Path
 
-import torch
-
 from .. import monitoring, paths
 from . import base
 
@@ -22,7 +20,7 @@ logger = logging.getLogger(__name__)
 def run(cfg, dataset, X_train, y_train, metadata, X_test) -> dict:
     from src.models.nn_model import NNBaseline
 
-    torch.manual_seed(cfg.experiment.seed)
+    base.set_seed(cfg.experiment.seed)
 
     model_params = dict(cfg.experiment.model.model_params)
     emulator = NNBaseline(model_params)

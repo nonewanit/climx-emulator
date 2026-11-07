@@ -13,6 +13,27 @@ from .. import paths, submission, validation
 logger = logging.getLogger(__name__)
 
 
+def set_seed(seed: int) -> None:
+    """Deterministic training across runs and machines (incl. GPU).
+
+    Seeded: python random, numpy, torch (CPU + all GPUs), cuDNN deterministic
+    mode (slightly slower, bit-reproducible). Called by every learned-model
+    runner with the experiment's `seed` (default 42 in the configs).
+    """
+    import random
+
+    import numpy as np
+    import torch
+
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
+
 def run_experiment(emulator, model_name: str, dataset, X_train, y_train,
                    metadata: dict, X_test, record: bool = True) -> dict:
     """Shared experiment tail. With record=False (smoke runs) the submission

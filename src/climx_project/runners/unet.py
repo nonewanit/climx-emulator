@@ -9,8 +9,6 @@ tier — the model class is identical.
 import logging
 from pathlib import Path
 
-import torch
-
 from .. import monitoring, paths
 from ..models.unet import UNetEmulator
 from . import base
@@ -19,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 def run(cfg, dataset, X_train, y_train, metadata, X_test) -> dict:
-    torch.manual_seed(cfg.experiment.seed)
+    base.set_seed(cfg.experiment.seed)
 
     model_params = dict(cfg.experiment.model.model_params)
     emulator = UNetEmulator(model_params)
