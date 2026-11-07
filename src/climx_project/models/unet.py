@@ -51,11 +51,13 @@ class DoubleConv(nn.Module):
 
 class UNetModule(pl.LightningModule):
     def __init__(self, n_in=22, n_out=7, base_channels=64,
-                 variable_weights=None, learning_rate=1e-3, pad_to=(16, 32)):
+                 variable_weights=None, learning_rate=1e-3, pad_to=(16, 32),
+                 skip_connections=True):
         super().__init__()
         self.save_hyperparameters()
         b = base_channels
         self.pad_h, self.pad_w = int(pad_to[0]), int(pad_to[1])
+        self.skip = bool(skip_connections)
         self.variable_weights = (
             torch.tensor(variable_weights, dtype=torch.float32)
             if variable_weights is not None else torch.ones(n_out)
@@ -66,9 +68,17 @@ class UNetModule(pl.LightningModule):
         self.bottleneck = DoubleConv(2 * b, 4 * b)
         self.pool = nn.MaxPool2d(2)
         self.up1 = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=False)
-        self.dec1 = DoubleConv(4 * b, 2 * b)
         self.up2 = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=False)
-        self.dec2 = DoubleConv(2 * b, b)
+        # Classic U-Net skips: encoder features are concatenated into the
+        # decoder (spatial sizes match because of the padded working grid).
+        # skip_connections=False reproduces the plain encoder-decoder used in
+        # the first lite submissions.
+        if self.skip:
+            self.dec1 = DoubleConv(4 * b + 2 * b, 2 * b)  # bottleneck + enc2
+            self.dec2 = DoubleConv(2 * b + b, b)          # dec1 + enc1
+        else:
+            self.dec1 = DoubleConv(4 * b, 2 * b)
+            self.dec2 = DoubleConv(2 * b, b)
         self.head = nn.Conv2d(b, n_out, 1)
 
     def forward(self, x):
@@ -83,8 +93,10 @@ class UNetModule(pl.LightningModule):
         e1 = self.enc1(x)
         e2 = self.enc2(self.pool(e1))
         b = self.bottleneck(self.pool(e2))
-        d1 = self.dec1(self.up1(b))
-        d2 = self.dec2(self.up2(d1))
+        d1_in = torch.cat([self.up1(b), e2], dim=1) if self.skip else self.up1(b)
+        d1 = self.dec1(d1_in)
+        d2_in = torch.cat([self.up2(d1), e1], dim=1) if self.skip else self.up2(d1)
+        d2 = self.dec2(d2_in)
         out = self.head(d2)
         return out[:, :, :h_in, :w_in]
 

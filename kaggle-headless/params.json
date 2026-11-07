@@ -1,9 +1,10 @@
 {
-  "_comment": "Edit these overrides, then `kaggle kernels push -p kaggle-headless`. Every key is a Hydra override appended to `experiment=unet`. Keep `experiment.record=true` unless it is a smoke test.",
+  "_comment": "A/B arm B: 5 epochs, seed 42, skip connections OFF (reproduces the submitted architecture).",
   "train_args": [
     "experiment=unet",
-    "experiment.trainer.max_epochs=20",
+    "experiment.trainer.max_epochs=5",
     "experiment.seed=42",
-    "experiment.record=true"
+    "experiment.record=true",
+    "experiment.model.model_params.skip_connections=false"
   ]
 }
