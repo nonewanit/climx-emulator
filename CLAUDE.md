@@ -33,7 +33,7 @@ pip install -e .          # installs ONLY climx_project; run from repo root
 - **Network**: `github.com` and `huggingface.co` are blocked. Clone git via `https://ghfast.top/https://github.com/...`; download HF data from `https://hf-mirror.com` with **`curl -4`** (this machine has no IPv6 route — `huggingface_hub`'s HTTP client hangs).
 - **dask scheduler must stay single-threaded** — the threads scheduler deadlocked in `to_netcdf` (all threads in `futex_do_wait`), and `zarr` writes are at the same risk.
 - `to_netcdf(..., compute=False)` returns a Delayed that **must be `.compute()`d** — discarding it writes only the file header (~300 KB files, no data).
-- Kaggle API key still pending (user's manual step): `~/.kaggle/kaggle.json` needed for `kaggle competitions download/submit`; team must be registered **before the first submission** (merging teams later wipes history). Daily submission quota ~5.
+- Kaggle CLI v2.2.5 credentials live at `~/.kaggle/access_token` (new-style; legacy `kaggle.json` also accepted — `climx_project.data` checks for either). Team must be registered **before the first submission** (merging teams later wipes history). Daily submission quota ~2.
 
 ## Starter-kit bugs we route around
 

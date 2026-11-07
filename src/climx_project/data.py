@@ -2,7 +2,8 @@
 
 Two download routes:
 - Kaggle CLI (primary): `kaggle competitions download -c climx-main-track`.
-  Needs the user's API key at ~/.kaggle/kaggle.json. The bundle's internal
+  Needs Kaggle credentials at ~/.kaggle/access_token (CLI v2.x) or the
+  legacy ~/.kaggle/kaggle.json. The bundle's internal
   layout is NOT assumed — map_lite_files() inspects it and hardlinks whatever
   it finds into data/lite/ under the exact names the starter kit globs for.
 - Hugging Face mirror (fallback): starter's get_dataset_from_hf with
@@ -55,12 +56,14 @@ def download_kaggle_bundle(competition: str = KAGGLE_COMPETITION) -> Path:
     if BUNDLE_ZIP.exists() and BUNDLE_ZIP.stat().st_size > 0:
         logger.info("Kaggle bundle already present: %s", BUNDLE_ZIP)
         return BUNDLE_ZIP
-    if not (Path.home() / ".kaggle" / "kaggle.json").exists():
+    creds = Path.home() / ".kaggle"
+    if not ((creds / "access_token").exists() or (creds / "kaggle.json").exists()):
         raise RuntimeError(
-            "No ~/.kaggle/kaggle.json found. Create a Kaggle API key "
-            "(Account -> Settings -> Create New API Token), save it to "
-            "~/.kaggle/kaggle.json (chmod 600), and accept the competition "
-            "rules at https://www.kaggle.com/competitions/climx-main-track/rules. "
+            "No Kaggle credentials found in ~/.kaggle/. Create an API token "
+            "(Account -> Settings -> Create New API Token) and save it to "
+            "~/.kaggle/access_token (CLI v2.x; legacy name kaggle.json), "
+            "chmod 600, and accept the competition rules at "
+            "https://www.kaggle.com/competitions/climx-main-track/rules. "
             "Fallback: `python -m climx_project.data download-hf`."
         )
     cmd = ["kaggle", "competitions", "download", "-c", competition, "-p", str(paths.DATA_DIR)]

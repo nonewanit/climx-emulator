@@ -39,7 +39,8 @@ pip install -e .
 # 2. One-time, every team member: Kaggle account + accept the competition rules
 #    (https://www.kaggle.com/competitions/climx-main-track/rules). ONE member
 #    also creates an API key (Account → Settings → Create New API Token) saved as
-#    ~/.kaggle/kaggle.json (chmod 600), and creates the team — everyone joins
+#    ~/.kaggle/access_token (CLI v2.x; legacy name kaggle.json), chmod 600, and
+#    creates the team — everyone joins
 #    BEFORE the first submission (merging teams later wipes submission history).
 ```
 

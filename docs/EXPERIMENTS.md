@@ -13,7 +13,7 @@ small code change (5 minutes for him), not a workaround.
 
 ```bash
 cd climx/kaggle-headless
-kaggle kernels push -p .          # needs YOUR Kaggle API key in ~/.kaggle/kaggle.json
+kaggle kernels push -p .          # needs YOUR Kaggle API key in ~/.kaggle/access_token (CLI v2.x)
 ```
 
 4. Watch progress:
