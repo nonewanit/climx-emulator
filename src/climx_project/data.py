@@ -240,7 +240,10 @@ def open_full_datasets(*, hist_days: int | None = None, train_days: int | None =
     def open_one(suffix: str, n_days: int | None):
         url = f"{FULL_REPO}/{FULL_PREFIX}{suffix}.nc"
         f = fs.open(url, "rb")
-        ds = xr.open_dataset(f, engine="h5netcdf", chunks=chunks or {})
+        # Time-chunking is ESSENTIAL for remote streaming: with chunks={} the
+        # whole (multi-GB) variable is one dask chunk and every access pulls
+        # the entire file over HTTP. ~1 year per chunk = ~80 MB per var/read.
+        ds = xr.open_dataset(f, engine="h5netcdf", chunks=chunks or {"time": 365})
         if n_days:
             ds = ds.isel(time=slice(0, n_days))
         return ds
