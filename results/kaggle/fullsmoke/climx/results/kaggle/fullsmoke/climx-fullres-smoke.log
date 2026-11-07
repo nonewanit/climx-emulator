@@ -1,0 +1,476 @@
+[{"stream_name":"stderr","time":11.749925406,"data":"/usr/local/lib/python3.13/dist-packages/nbformat/validator.py:434: MissingIDFieldWarning: Cell is missing an id field, this will become a hard error in future nbformat versions. You may want to use `normalize()` on your notebooks before validations (available since nbformat 5.1.4). Previous versions of nbformat are fixing this issue transparently, and will stop doing so in the future.\n"}
+,{"stream_name":"stderr","time":11.749968933,"data":"  _validate(nbdict, ref, version, version_minor, relax_add_props)\n"}
+,{"stream_name":"stderr","time":13.283837285,"data":"0.00s - Debugger warning: It seems that frozen modules are being used, which may\n"}
+,{"stream_name":"stderr","time":13.283878627,"data":"0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off\n"}
+,{"stream_name":"stderr","time":13.283882705,"data":"0.00s - to python to disable frozen modules.\n"}
+,{"stream_name":"stderr","time":13.283885635,"data":"0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.\n"}
+,{"stream_name":"stderr","time":14.126760444,"data":"0.00s - Debugger warning: It seems that frozen modules are being used, which may\n"}
+,{"stream_name":"stderr","time":14.126838027,"data":"0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off\n"}
+,{"stream_name":"stderr","time":14.126848661,"data":"0.00s - to python to disable frozen modules.\n"}
+,{"stream_name":"stderr","time":14.126853071,"data":"0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.\n"}
+,{"stream_name":"stderr","time":15.716462088,"data":"Cloning into '/kaggle/working/climx'...\n"}
+,{"stream_name":"stderr","time":15.91958423,"data":"Cloning into '/kaggle/working/climx'...\n"}
+,{"stream_name":"stderr","time":15.919625242,"data":"\n"}
+,{"stream_name":"stderr","time":15.919629209,"data":"Cloning into '/kaggle/working/climx'...\n"}
+,{"stream_name":"stdout","time":42.125244149,"data":"setup done\n"}
+,{"stream_name":"stderr","time":102.425221043,"data":"INFO fullres_smoke: === open full-res NetCDFs remotely ===\n"}
+,{"stream_name":"stderr","time":102.629213767,"data":"INFO fullres_smoke: === open full-res NetCDFs remotely ===\n"}
+,{"stream_name":"stderr","time":102.629246636,"data":"\n"}
+,{"stream_name":"stderr","time":102.629252449,"data":"INFO fullres_smoke: === open full-res NetCDFs remotely ===\n"}
+,{"stream_name":"stderr","time":102.631933206,"data":"INFO httpx: HTTP Request: GET https://huggingface.co/api/agent-harnesses \"HTTP/1.1 200 OK\"\n"}
+,{"stream_name":"stderr","time":102.696290179,"data":"INFO httpx: HTTP Request: GET https://huggingface.co/api/datasets/isp-uv-es/ClimX \"HTTP/1.1 200 OK\"\n"}
+,{"stream_name":"stderr","time":102.779452504,"data":"INFO httpx: HTTP Request: GET https://huggingface.co/api/datasets/isp-uv-es/ClimX/tree/main/full?recursive=false\u0026expand=false \"HTTP/1.1 200 OK\"\n"}
+,{"stream_name":"stderr","time":102.834963492,"data":"INFO httpx: HTTP Request: GET https://huggingface.co/api/agent-harnesses \"HTTP/1.1 200 OK\"\n"}
+,{"stream_name":"stderr","time":102.834999235,"data":"INFO httpx: HTTP Request: GET https://huggingface.co/api/datasets/isp-uv-es/ClimX \"HTTP/1.1 200 OK\"\n"}
+,{"stream_name":"stderr","time":102.835006105,"data":"INFO httpx: HTTP Request: GET https://huggingface.co/api/datasets/isp-uv-es/ClimX/tree/main/full?recursive=false\u0026expand=false \"HTTP/1.1 200 OK\"\n"}
+,{"stream_name":"stderr","time":102.835012396,"data":"\n"}
+,{"stream_name":"stderr","time":102.835017537,"data":"INFO httpx: HTTP Request: GET https://huggingface.co/api/agent-harnesses \"HTTP/1.1 200 OK\"\n"}
+,{"stream_name":"stderr","time":102.835023249,"data":"INFO httpx: HTTP Request: GET https://huggingface.co/api/datasets/isp-uv-es/ClimX \"HTTP/1.1 200 OK\"\n"}
+,{"stream_name":"stderr","time":102.835052934,"data":"INFO httpx: HTTP Request: GET https://huggingface.co/api/datasets/isp-uv-es/ClimX/tree/main/full?recursive=false\u0026expand=false \"HTTP/1.1 200 OK\"\n"}
+,{"stream_name":"stderr","time":104.225477315,"data":"INFO httpx: HTTP Request: GET https://huggingface.co/datasets/isp-uv-es/ClimX/resolve/main/full/NorESM2-MM_r1i1p1f1_with_forcing_hist_train_1850_1931.nc \"HTTP/1.1 302 Found\"\n"}
+,{"stream_name":"stderr","time":104.290004858,"data":"INFO httpx: HTTP Request: GET https://us.gcp.cdn.hf.co/xet-bridge-us/69863056a587f2262539d7ac/8fad75181071b18cb718dfda6678a502b803465e21ac40bdf16114cb8832cc94?response-content-type=application%2Fx-netcdf\u0026user_id=public\u0026X-Xet-Cas-Uid=public\u0026xip=3FjYNAgMBUA\u0026response-content-disposition=inline%3B+filename*%3DUTF-8%27%27NorESM2-MM_r1i1p1f1_with_forcing_hist_train_1850_1931.nc%3B+filename%3D%22NorESM2-MM_r1i1p1f1_with_forcing_hist_train_1850_1931.nc%22%3B\u0026Expires=1794030283\u0026Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly91cy5nY3AuY2RuLmhmLmNvL3hldC1icmlkZ2UtdXMvNjk4NjMwNTZhNTg3ZjIyNjI1MzlkN2FjLzhmYWQ3NTE4MTA3MWIxOGNiNzE4ZGZkYTY2NzhhNTAyYjgwMzQ2NWUyMWFjNDBiZGYxNjExNGNiODgzMmNjOTRcXD9yZXNwb25zZS1jb250ZW50LXR5cGU9KiZ1c2VyX2lkPXB1YmxpYyZYLVhldC1DYXMtVWlkPXB1YmxpYyZ4aXA9M0ZqWU5BZ01CVUEmcmVzcG9uc2UtY29udGVudC1kaXNwb3NpdGlvbj0qIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJFcG9jaFRpbWUiOjE3OTQwMzAyODN9fX1dfQ__\u0026Signature=MEQCIBpLOCNu-wAb3DUlu4Fj53bmceH2MRIJrP0S8Cj0TSbdAiAfd67GQ2Okz9NFin-ynsFqocwD7UGGG%7EV0vDa24P8uJA__\u0026Key-Pair-Id=01KXEF4KZ1B6FV465MAWR4M21F\u0026Hash-Algorithm=SHA256 \"HTTP/1.1 206 Partial Content\"\n"}
+,{"stream_name":"stderr","time":104.428345405,"data":"INFO httpx: HTTP Request: GET https://huggingface.co/datasets/isp-uv-es/ClimX/resolve/main/full/NorESM2-MM_r1i1p1f1_with_forcing_hist_train_1850_1931.nc \"HTTP/1.1 302 Found\"\n"}
+,{"stream_name":"stderr","time":104.428391828,"data":"INFO httpx: HTTP Request: GET https://us.gcp.cdn.hf.co/xet-bridge-us/69863056a587f2262539d7ac/8fad75181071b18cb718dfda6678a502b803465e21ac40bdf16114cb8832cc94?response-content-type=application%2Fx-netcdf\u0026user_id=public\u0026X-Xet-Cas-Uid=public\u0026xip=3FjYNAgMBUA\u0026response-content-disposition=inline%3B+filename*%3DUTF-8%27%27NorESM2-MM_r1i1p1f1_with_forcing_hist_train_1850_1931.nc%3B+filename%3D%22NorESM2-MM_r1i1p1f1_with_forcing_hist_train_1850_1931.nc%22%3B\u0026Expires=1794030283\u0026Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly91cy5nY3AuY2RuLmhmLmNvL3hldC1icmlkZ2UtdXMvNjk4NjMwNTZhNTg3ZjIyNjI1MzlkN2FjLzhmYWQ3NTE4MTA3MWIxOGNiNzE4ZGZkYTY2NzhhNTAyYjgwMzQ2NWUyMWFjNDBiZGYxNjExNGNiODgzMmNjOTRcXD9yZXNwb25zZS1jb250ZW50LXR5cGU9KiZ1c2VyX2lkPXB1YmxpYyZYLVhldC1DYXMtVWlkPXB1YmxpYyZ4aXA9M0ZqWU5BZ01CVUEmcmVzcG9uc2UtY29udGVudC1kaXNwb3NpdGlvbj0qIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJFcG9jaFRpbWUiOjE3OTQwMzAyODN9fX1dfQ__\u0026Signature=MEQCIBpLOCNu-wAb3DUlu4Fj53bmceH2MRIJrP0S8Cj0TSbdAiAfd67GQ2Okz9NFin-ynsFqocwD7UGGG%7EV0vDa24P8uJA__\u0026Key-Pair-Id=01KXEF4KZ1B6FV465MAWR4M21F\u0026Hash-Algorithm=SHA256 \"HTTP/1.1 206 Partial Content\"\n"}
+,{"stream_name":"stderr","time":104.428403948,"data":"\n"}
+,{"stream_name":"stderr","time":104.428407071,"data":"INFO httpx: HTTP Request: GET https://huggingface.co/datasets/isp-uv-es/ClimX/resolve/main/full/NorESM2-MM_r1i1p1f1_with_forcing_hist_train_1850_1931.nc \"HTTP/1.1 302 Found\"\n"}
+,{"stream_name":"stderr","time":104.428411657,"data":"INFO httpx: HTTP Request: GET https://us.gcp.cdn.hf.co/xet-bridge-us/69863056a587f2262539d7ac/8fad75181071b18cb718dfda6678a502b803465e21ac40bdf16114cb8832cc94?response-content-type=application%2Fx-netcdf\u0026user_id=public\u0026X-Xet-Cas-Uid=public\u0026xip=3FjYNAgMBUA\u0026response-content-disposition=inline%3B+filename*%3DUTF-8%27%27NorESM2-MM_r1i1p1f1_with_forcing_hist_train_1850_1931.nc%3B+filename%3D%22NorESM2-MM_r1i1p1f1_with_forcing_hist_train_1850_1931.nc%22%3B\u0026Expires=1794030283\u0026Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly91cy5nY3AuY2RuLmhmLmNvL3hldC1icmlkZ2UtdXMvNjk4NjMwNTZhNTg3ZjIyNjI1MzlkN2FjLzhmYWQ3NTE4MTA3MWIxOGNiNzE4ZGZkYTY2NzhhNTAyYjgwMzQ2NWUyMWFjNDBiZGYxNjExNGNiODgzMmNjOTRcXD9yZXNwb25zZS1jb250ZW50LXR5cGU9KiZ1c2VyX2lkPXB1YmxpYyZYLVhldC1DYXMtVWlkPXB1YmxpYyZ4aXA9M0ZqWU5BZ01CVUEmcmVzcG9uc2UtY29udGVudC1kaXNwb3NpdGlvbj0qIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJFcG9jaFRpbWUiOjE3OTQwMzAyODN9fX1dfQ__\u0026Signature=MEQCIBpLOCNu-wAb3DUlu4Fj53bmceH2MRIJrP0S8Cj0TSbdAiAfd67GQ2Okz9NFin-ynsFqocwD7UGGG%7EV0vDa24P8uJA__\u0026Key-Pair-Id=01KXEF4KZ1B6FV465MAWR4M21F\u0026Hash-Algorithm=SHA256 \"HTTP/1.1 206 Partial Content\"\n"}
+,{"stream_name":"stderr","time":105.460595938,"data":"INFO httpx: HTTP Request: GET https://huggingface.co/datasets/isp-uv-es/ClimX/resolve/main/full/NorESM2-MM_r1i1p1f1_with_forcing_hist_train_1932_2014.nc \"HTTP/1.1 302 Found\"\n"}
+,{"stream_name":"stderr","time":105.505504602,"data":"INFO httpx: HTTP Request: GET https://us.gcp.cdn.hf.co/xet-bridge-us/69863056a587f2262539d7ac/ac0a7f7ccaf7fb04cefed0dec7ee83a82adc52131cdd61e8f649af893a167f2a?response-content-type=application%2Fx-netcdf\u0026xip=3FjYNAgMBUA\u0026X-Xet-Cas-Uid=public\u0026response-content-disposition=inline%3B+filename*%3DUTF-8%27%27NorESM2-MM_r1i1p1f1_with_forcing_hist_train_1932_2014.nc%3B+filename%3D%22NorESM2-MM_r1i1p1f1_with_forcing_hist_train_1932_2014.nc%22%3B\u0026user_id=public\u0026Expires=1794030284\u0026Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly91cy5nY3AuY2RuLmhmLmNvL3hldC1icmlkZ2UtdXMvNjk4NjMwNTZhNTg3ZjIyNjI1MzlkN2FjL2FjMGE3ZjdjY2FmN2ZiMDRjZWZlZDBkZWM3ZWU4M2E4MmFkYzUyMTMxY2RkNjFlOGY2NDlhZjg5M2ExNjdmMmFcXD9yZXNwb25zZS1jb250ZW50LXR5cGU9KiZ4aXA9M0ZqWU5BZ01CVUEmWC1YZXQtQ2FzLVVpZD1wdWJsaWMmcmVzcG9uc2UtY29udGVudC1kaXNwb3NpdGlvbj0qJnVzZXJfaWQ9cHVibGljIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJFcG9jaFRpbWUiOjE3OTQwMzAyODR9fX1dfQ__\u0026Signature=MEUCIQCcvD3mTe0%7E6GcBftw0TOwNcwD%7EnhIbwRAt30xN%7EmACJwIgCzsKvhXD6yuimGd42rA8zljRsGnWNtSeHujIZkIHJc0_\u0026Key-Pair-Id=01KXEF4KZ1B6FV465MAWR4M21F\u0026Hash-Algorithm=SHA256 \"HTTP/1.1 206 Partial Content\"\n"}
+,{"stream_name":"stderr","time":105.664016476,"data":"INFO httpx: HTTP Request: GET https://huggingface.co/datasets/isp-uv-es/ClimX/resolve/main/full/NorESM2-MM_r1i1p1f1_with_forcing_hist_train_1932_2014.nc \"HTTP/1.1 302 Found\"\n"}
+,{"stream_name":"stderr","time":105.664072912,"data":"INFO httpx: HTTP Request: GET https://us.gcp.cdn.hf.co/xet-bridge-us/69863056a587f2262539d7ac/ac0a7f7ccaf7fb04cefed0dec7ee83a82adc52131cdd61e8f649af893a167f2a?response-content-type=application%2Fx-netcdf\u0026xip=3FjYNAgMBUA\u0026X-Xet-Cas-Uid=public\u0026response-content-disposition=inline%3B+filename*%3DUTF-8%27%27NorESM2-MM_r1i1p1f1_with_forcing_hist_train_1932_2014.nc%3B+filename%3D%22NorESM2-MM_r1i1p1f1_with_forcing_hist_train_1932_2014.nc%22%3B\u0026user_id=public\u0026Expires=1794030284\u0026Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly91cy5nY3AuY2RuLmhmLmNvL3hldC1icmlkZ2UtdXMvNjk4NjMwNTZhNTg3ZjIyNjI1MzlkN2FjL2FjMGE3ZjdjY2FmN2ZiMDRjZWZlZDBkZWM3ZWU4M2E4MmFkYzUyMTMxY2RkNjFlOGY2NDlhZjg5M2ExNjdmMmFcXD9yZXNwb25zZS1jb250ZW50LXR5cGU9KiZ4aXA9M0ZqWU5BZ01CVUEmWC1YZXQtQ2FzLVVpZD1wdWJsaWMmcmVzcG9uc2UtY29udGVudC1kaXNwb3NpdGlvbj0qJnVzZXJfaWQ9cHVibGljIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJFcG9jaFRpbWUiOjE3OTQwMzAyODR9fX1dfQ__\u0026Signature=MEUCIQCcvD3mTe0%7E6GcBftw0TOwNcwD%7EnhIbwRAt30xN%7EmACJwIgCzsKvhXD6yuimGd42rA8zljRsGnWNtSeHujIZkIHJc0_\u0026Key-Pair-Id=01KXEF4KZ1B6FV465MAWR4M21F\u0026Hash-Algorithm=SHA256 \"HTTP/1.1 206 Partial Content\"\n"}
+,{"stream_name":"stderr","time":105.664111726,"data":"\n"}
+,{"stream_name":"stderr","time":105.664115895,"data":"INFO httpx: HTTP Request: GET https://huggingface.co/datasets/isp-uv-es/ClimX/resolve/main/full/NorESM2-MM_r1i1p1f1_with_forcing_hist_train_1932_2014.nc \"HTTP/1.1 302 Found\"\n"}
+,{"stream_name":"stderr","time":105.664122083,"data":"INFO httpx: HTTP Request: GET https://us.gcp.cdn.hf.co/xet-bridge-us/69863056a587f2262539d7ac/ac0a7f7ccaf7fb04cefed0dec7ee83a82adc52131cdd61e8f649af893a167f2a?response-content-type=application%2Fx-netcdf\u0026xip=3FjYNAgMBUA\u0026X-Xet-Cas-Uid=public\u0026response-content-disposition=inline%3B+filename*%3DUTF-8%27%27NorESM2-MM_r1i1p1f1_with_forcing_hist_train_1932_2014.nc%3B+filename%3D%22NorESM2-MM_r1i1p1f1_with_forcing_hist_train_1932_2014.nc%22%3B\u0026user_id=public\u0026Expires=1794030284\u0026Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly91cy5nY3AuY2RuLmhmLmNvL3hldC1icmlkZ2UtdXMvNjk4NjMwNTZhNTg3ZjIyNjI1MzlkN2FjL2FjMGE3ZjdjY2FmN2ZiMDRjZWZlZDBkZWM3ZWU4M2E4MmFkYzUyMTMxY2RkNjFlOGY2NDlhZjg5M2ExNjdmMmFcXD9yZXNwb25zZS1jb250ZW50LXR5cGU9KiZ4aXA9M0ZqWU5BZ01CVUEmWC1YZXQtQ2FzLVVpZD1wdWJsaWMmcmVzcG9uc2UtY29udGVudC1kaXNwb3NpdGlvbj0qJnVzZXJfaWQ9cHVibGljIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJFcG9jaFRpbWUiOjE3OTQwMzAyODR9fX1dfQ__\u0026Signature=MEUCIQCcvD3mTe0%7E6GcBftw0TOwNcwD%7EnhIbwRAt30xN%7EmACJwIgCzsKvhXD6yuimGd42rA8zljRsGnWNtSeHujIZkIHJc0_\u0026Key-Pair-Id=01KXEF4KZ1B6FV465MAWR4M21F\u0026Hash-Algorithm=SHA256 \"HTTP/1.1 206 Partial Content\"\n"}
+,{"stream_name":"stderr","time":106.43053272,"data":"/kaggle/working/climx/src/climx_project/data.py:248: FutureWarning: In a future version of xarray the default value for data_vars will change from data_vars='all' to data_vars=None. This is likely to lead to different results when multiple datasets have matching variables with overlapping values. To opt in to new defaults and get rid of these warnings now use `set_options(use_new_combine_kwarg_defaults=True) or set data_vars explicitly.\n"}
+,{"stream_name":"stderr","time":106.430592424,"data":"  hist = xr.combine_by_coords(\n"}
+,{"stream_name":"stderr","time":106.633311238,"data":"/kaggle/working/climx/src/climx_project/data.py:248: FutureWarning: In a future version of xarray the default value for data_vars will change from data_vars='all' to data_vars=None. This is likely to lead to different results when multiple datasets have matching variables with overlapping values. To opt in to new defaults and get rid of these warnings now use `set_options(use_new_combine_kwarg_defaults=True) or set data_vars explicitly.\n"}
+,{"stream_name":"stderr","time":106.633352038,"data":"  hist = xr.combine_by_coords(\n"}
+,{"stream_name":"stderr","time":106.633357957,"data":"\n"}
+,{"stream_name":"stderr","time":106.633361967,"data":"/kaggle/working/climx/src/climx_project/data.py:248: FutureWarning: In a future version of xarray the default value for data_vars will change from data_vars='all' to data_vars=None. This is likely to lead to different results when multiple datasets have matching variables with overlapping values. To opt in to new defaults and get rid of these warnings now use `set_options(use_new_combine_kwarg_defaults=True) or set data_vars explicitly.\n"}
+,{"stream_name":"stderr","time":106.633367738,"data":"  hist = xr.combine_by_coords(\n"}
+,{"stream_name":"stderr","time":107.686198683,"data":"INFO httpx: HTTP Request: GET https://huggingface.co/datasets/isp-uv-es/ClimX/resolve/main/full/NorESM2-MM_r1i1p1f1_with_forcing_train_ssp126.nc \"HTTP/1.1 302 Found\"\n"}
+,{"stream_name":"stderr","time":107.727412462,"data":"INFO httpx: HTTP Request: GET https://us.gcp.cdn.hf.co/xet-bridge-us/69863056a587f2262539d7ac/a0f33c0780f868ad81318d1fe0f123c247d65a3fa5d9ddf3068232e3bf62e5d8?response-content-type=application%2Fx-netcdf\u0026user_id=public\u0026xip=3FjYNAgMBUA\u0026response-content-disposition=inline%3B+filename*%3DUTF-8%27%27NorESM2-MM_r1i1p1f1_with_forcing_train_ssp126.nc%3B+filename%3D%22NorESM2-MM_r1i1p1f1_with_forcing_train_ssp126.nc%22%3B\u0026X-Xet-Cas-Uid=public\u0026Expires=1794030287\u0026Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly91cy5nY3AuY2RuLmhmLmNvL3hldC1icmlkZ2UtdXMvNjk4NjMwNTZhNTg3ZjIyNjI1MzlkN2FjL2EwZjMzYzA3ODBmODY4YWQ4MTMxOGQxZmUwZjEyM2MyNDdkNjVhM2ZhNWQ5ZGRmMzA2ODIzMmUzYmY2MmU1ZDhcXD9yZXNwb25zZS1jb250ZW50LXR5cGU9KiZ1c2VyX2lkPXB1YmxpYyZ4aXA9M0ZqWU5BZ01CVUEmcmVzcG9uc2UtY29udGVudC1kaXNwb3NpdGlvbj0qJlgtWGV0LUNhcy1VaWQ9cHVibGljIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJFcG9jaFRpbWUiOjE3OTQwMzAyODd9fX1dfQ__\u0026Signature=MEQCIGz-vUI0ZF8b1qXGA7igo7TOX9L8%7EJTR7YhUju%7Ef2SPJAiAary83o%7E2UxDTXHwa1tWBtOTCTpT2YJCfpsS0OXw5xqg__\u0026Key-Pair-Id=01KXEF4KZ1B6FV465MAWR4M21F\u0026Hash-Algorithm=SHA256 \"HTTP/1.1 206 Partial Content\"\n"}
+,{"stream_name":"stderr","time":107.889137619,"data":"INFO httpx: HTTP Request: GET https://huggingface.co/datasets/isp-uv-es/ClimX/resolve/main/full/NorESM2-MM_r1i1p1f1_with_forcing_train_ssp126.nc \"HTTP/1.1 302 Found\"\n"}
+,{"stream_name":"stderr","time":107.889180289,"data":"INFO httpx: HTTP Request: GET https://us.gcp.cdn.hf.co/xet-bridge-us/69863056a587f2262539d7ac/a0f33c0780f868ad81318d1fe0f123c247d65a3fa5d9ddf3068232e3bf62e5d8?response-content-type=application%2Fx-netcdf\u0026user_id=public\u0026xip=3FjYNAgMBUA\u0026response-content-disposition=inline%3B+filename*%3DUTF-8%27%27NorESM2-MM_r1i1p1f1_with_forcing_train_ssp126.nc%3B+filename%3D%22NorESM2-MM_r1i1p1f1_with_forcing_train_ssp126.nc%22%3B\u0026X-Xet-Cas-Uid=public\u0026Expires=1794030287\u0026Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly91cy5nY3AuY2RuLmhmLmNvL3hldC1icmlkZ2UtdXMvNjk4NjMwNTZhNTg3ZjIyNjI1MzlkN2FjL2EwZjMzYzA3ODBmODY4YWQ4MTMxOGQxZmUwZjEyM2MyNDdkNjVhM2ZhNWQ5ZGRmMzA2ODIzMmUzYmY2MmU1ZDhcXD9yZXNwb25zZS1jb250ZW50LXR5cGU9KiZ1c2VyX2lkPXB1YmxpYyZ4aXA9M0ZqWU5BZ01CVUEmcmVzcG9uc2UtY29udGVudC1kaXNwb3NpdGlvbj0qJlgtWGV0LUNhcy1VaWQ9cHVibGljIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJFcG9jaFRpbWUiOjE3OTQwMzAyODd9fX1dfQ__\u0026Signature=MEQCIGz-vUI0ZF8b1qXGA7igo7TOX9L8%7EJTR7YhUju%7Ef2SPJAiAary83o%7E2UxDTXHwa1tWBtOTCTpT2YJCfpsS0OXw5xqg__\u0026Key-Pair-Id=01KXEF4KZ1B6FV465MAWR4M21F\u0026Hash-Algorithm=SHA256 \"HTTP/1.1 206 Partial Content\"\n"}
+,{"stream_name":"stderr","time":107.889193351,"data":"\n"}
+,{"stream_name":"stderr","time":107.889196999,"data":"INFO httpx: HTTP Request: GET https://huggingface.co/datasets/isp-uv-es/ClimX/resolve/main/full/NorESM2-MM_r1i1p1f1_with_forcing_train_ssp126.nc \"HTTP/1.1 302 Found\"\n"}
+,{"stream_name":"stderr","time":107.889203703,"data":"INFO httpx: HTTP Request: GET https://us.gcp.cdn.hf.co/xet-bridge-us/69863056a587f2262539d7ac/a0f33c0780f868ad81318d1fe0f123c247d65a3fa5d9ddf3068232e3bf62e5d8?response-content-type=application%2Fx-netcdf\u0026user_id=public\u0026xip=3FjYNAgMBUA\u0026response-content-disposition=inline%3B+filename*%3DUTF-8%27%27NorESM2-MM_r1i1p1f1_with_forcing_train_ssp126.nc%3B+filename%3D%22NorESM2-MM_r1i1p1f1_with_forcing_train_ssp126.nc%22%3B\u0026X-Xet-Cas-Uid=public\u0026Expires=1794030287\u0026Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly91cy5nY3AuY2RuLmhmLmNvL3hldC1icmlkZ2UtdXMvNjk4NjMwNTZhNTg3ZjIyNjI1MzlkN2FjL2EwZjMzYzA3ODBmODY4YWQ4MTMxOGQxZmUwZjEyM2MyNDdkNjVhM2ZhNWQ5ZGRmMzA2ODIzMmUzYmY2MmU1ZDhcXD9yZXNwb25zZS1jb250ZW50LXR5cGU9KiZ1c2VyX2lkPXB1YmxpYyZ4aXA9M0ZqWU5BZ01CVUEmcmVzcG9uc2UtY29udGVudC1kaXNwb3NpdGlvbj0qJlgtWGV0LUNhcy1VaWQ9cHVibGljIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJFcG9jaFRpbWUiOjE3OTQwMzAyODd9fX1dfQ__\u0026Signature=MEQCIGz-vUI0ZF8b1qXGA7igo7TOX9L8%7EJTR7YhUju%7Ef2SPJAiAary83o%7E2UxDTXHwa1tWBtOTCTpT2YJCfpsS0OXw5xqg__\u0026Key-Pair-Id=01KXEF4KZ1B6FV465MAWR4M21F\u0026Hash-Algorithm=SHA256 \"HTTP/1.1 206 Partial Content\"\n"}
+,{"stream_name":"stderr","time":108.677091775,"data":"INFO httpx: HTTP Request: GET https://huggingface.co/datasets/isp-uv-es/ClimX/resolve/main/full/NorESM2-MM_r1i1p1f1_with_forcing_train_ssp370.nc \"HTTP/1.1 302 Found\"\n"}
+,{"stream_name":"stderr","time":108.717129941,"data":"INFO httpx: HTTP Request: GET https://us.gcp.cdn.hf.co/xet-bridge-us/69863056a587f2262539d7ac/2d21a10aaa41b13af1bd065715a7edfd04b90a46238666c09814673cff97c6b5?user_id=public\u0026response-content-type=application%2Fx-netcdf\u0026xip=3FjYNAgMBUA\u0026X-Xet-Cas-Uid=public\u0026response-content-disposition=inline%3B+filename*%3DUTF-8%27%27NorESM2-MM_r1i1p1f1_with_forcing_train_ssp370.nc%3B+filename%3D%22NorESM2-MM_r1i1p1f1_with_forcing_train_ssp370.nc%22%3B\u0026Expires=1794030288\u0026Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly91cy5nY3AuY2RuLmhmLmNvL3hldC1icmlkZ2UtdXMvNjk4NjMwNTZhNTg3ZjIyNjI1MzlkN2FjLzJkMjFhMTBhYWE0MWIxM2FmMWJkMDY1NzE1YTdlZGZkMDRiOTBhNDYyMzg2NjZjMDk4MTQ2NzNjZmY5N2M2YjVcXD91c2VyX2lkPXB1YmxpYyZyZXNwb25zZS1jb250ZW50LXR5cGU9KiZ4aXA9M0ZqWU5BZ01CVUEmWC1YZXQtQ2FzLVVpZD1wdWJsaWMmcmVzcG9uc2UtY29udGVudC1kaXNwb3NpdGlvbj0qIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJFcG9jaFRpbWUiOjE3OTQwMzAyODh9fX1dfQ__\u0026Signature=MEYCIQDahl4oovntXdGPDyhpqRFvdQcCYSjMAoFDXs9pXfyEjwIhALvIKIi7ETulijxWOwe2hccsUGnp0m227GAgZtWkWoeS\u0026Key-Pair-Id=01KXEF4KZ1B6FV465MAWR4M21F\u0026Hash-Algorithm=SHA256 \"HTTP/1.1 206 Partial Content\"\n"}
+,{"stream_name":"stderr","time":108.879941035,"data":"INFO httpx: HTTP Request: GET https://huggingface.co/datasets/isp-uv-es/ClimX/resolve/main/full/NorESM2-MM_r1i1p1f1_with_forcing_train_ssp370.nc \"HTTP/1.1 302 Found\"\n"}
+,{"stream_name":"stderr","time":108.87998527,"data":"INFO httpx: HTTP Request: GET https://us.gcp.cdn.hf.co/xet-bridge-us/69863056a587f2262539d7ac/2d21a10aaa41b13af1bd065715a7edfd04b90a46238666c09814673cff97c6b5?user_id=public\u0026response-content-type=application%2Fx-netcdf\u0026xip=3FjYNAgMBUA\u0026X-Xet-Cas-Uid=public\u0026response-content-disposition=inline%3B+filename*%3DUTF-8%27%27NorESM2-MM_r1i1p1f1_with_forcing_train_ssp370.nc%3B+filename%3D%22NorESM2-MM_r1i1p1f1_with_forcing_train_ssp370.nc%22%3B\u0026Expires=1794030288\u0026Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly91cy5nY3AuY2RuLmhmLmNvL3hldC1icmlkZ2UtdXMvNjk4NjMwNTZhNTg3ZjIyNjI1MzlkN2FjLzJkMjFhMTBhYWE0MWIxM2FmMWJkMDY1NzE1YTdlZGZkMDRiOTBhNDYyMzg2NjZjMDk4MTQ2NzNjZmY5N2M2YjVcXD91c2VyX2lkPXB1YmxpYyZyZXNwb25zZS1jb250ZW50LXR5cGU9KiZ4aXA9M0ZqWU5BZ01CVUEmWC1YZXQtQ2FzLVVpZD1wdWJsaWMmcmVzcG9uc2UtY29udGVudC1kaXNwb3NpdGlvbj0qIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJFcG9jaFRpbWUiOjE3OTQwMzAyODh9fX1dfQ__\u0026Signature=MEYCIQDahl4oovntXdGPDyhpqRFvdQcCYSjMAoFDXs9pXfyEjwIhALvIKIi7ETulijxWOwe2hccsUGnp0m227GAgZtWkWoeS\u0026Key-Pair-Id=01KXEF4KZ1B6FV465MAWR4M21F\u0026Hash-Algorithm=SHA256 \"HTTP/1.1 206 Partial Content\"\n"}
+,{"stream_name":"stderr","time":108.879995301,"data":"\n"}
+,{"stream_name":"stderr","time":108.879999979,"data":"INFO httpx: HTTP Request: GET https://huggingface.co/datasets/isp-uv-es/ClimX/resolve/main/full/NorESM2-MM_r1i1p1f1_with_forcing_train_ssp370.nc \"HTTP/1.1 302 Found\"\n"}
+,{"stream_name":"stderr","time":108.880006064,"data":"INFO httpx: HTTP Request: GET https://us.gcp.cdn.hf.co/xet-bridge-us/69863056a587f2262539d7ac/2d21a10aaa41b13af1bd065715a7edfd04b90a46238666c09814673cff97c6b5?user_id=public\u0026response-content-type=application%2Fx-netcdf\u0026xip=3FjYNAgMBUA\u0026X-Xet-Cas-Uid=public\u0026response-content-disposition=inline%3B+filename*%3DUTF-8%27%27NorESM2-MM_r1i1p1f1_with_forcing_train_ssp370.nc%3B+filename%3D%22NorESM2-MM_r1i1p1f1_with_forcing_train_ssp370.nc%22%3B\u0026Expires=1794030288\u0026Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly91cy5nY3AuY2RuLmhmLmNvL3hldC1icmlkZ2UtdXMvNjk4NjMwNTZhNTg3ZjIyNjI1MzlkN2FjLzJkMjFhMTBhYWE0MWIxM2FmMWJkMDY1NzE1YTdlZGZkMDRiOTBhNDYyMzg2NjZjMDk4MTQ2NzNjZmY5N2M2YjVcXD91c2VyX2lkPXB1YmxpYyZyZXNwb25zZS1jb250ZW50LXR5cGU9KiZ4aXA9M0ZqWU5BZ01CVUEmWC1YZXQtQ2FzLVVpZD1wdWJsaWMmcmVzcG9uc2UtY29udGVudC1kaXNwb3NpdGlvbj0qIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJFcG9jaFRpbWUiOjE3OTQwMzAyODh9fX1dfQ__\u0026Signature=MEYCIQDahl4oovntXdGPDyhpqRFvdQcCYSjMAoFDXs9pXfyEjwIhALvIKIi7ETulijxWOwe2hccsUGnp0m227GAgZtWkWoeS\u0026Key-Pair-Id=01KXEF4KZ1B6FV465MAWR4M21F\u0026Hash-Algorithm=SHA256 \"HTTP/1.1 206 Partial Content\"\n"}
+,{"stream_name":"stderr","time":109.578969763,"data":"INFO httpx: HTTP Request: GET https://huggingface.co/datasets/isp-uv-es/ClimX/resolve/main/full/NorESM2-MM_r1i1p1f1_with_forcing_test_forcings_ssp245.nc \"HTTP/1.1 302 Found\"\n"}
+,{"stream_name":"stderr","time":109.619009524,"data":"INFO httpx: HTTP Request: GET https://us.gcp.cdn.hf.co/xet-bridge-us/69863056a587f2262539d7ac/70125292d41e94137eddf5d31d9c1d400799a126136c24fb58f8c2f40037f170?X-Xet-Cas-Uid=public\u0026response-content-type=application%2Fx-netcdf\u0026user_id=public\u0026xip=3FjYNAgMBUA\u0026response-content-disposition=inline%3B+filename*%3DUTF-8%27%27NorESM2-MM_r1i1p1f1_with_forcing_test_forcings_ssp245.nc%3B+filename%3D%22NorESM2-MM_r1i1p1f1_with_forcing_test_forcings_ssp245.nc%22%3B\u0026Expires=1794030289\u0026Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly91cy5nY3AuY2RuLmhmLmNvL3hldC1icmlkZ2UtdXMvNjk4NjMwNTZhNTg3ZjIyNjI1MzlkN2FjLzcwMTI1MjkyZDQxZTk0MTM3ZWRkZjVkMzFkOWMxZDQwMDc5OWExMjYxMzZjMjRmYjU4ZjhjMmY0MDAzN2YxNzBcXD9YLVhldC1DYXMtVWlkPXB1YmxpYyZyZXNwb25zZS1jb250ZW50LXR5cGU9KiZ1c2VyX2lkPXB1YmxpYyZ4aXA9M0ZqWU5BZ01CVUEmcmVzcG9uc2UtY29udGVudC1kaXNwb3NpdGlvbj0qIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJFcG9jaFRpbWUiOjE3OTQwMzAyODl9fX1dfQ__\u0026Signature=MEYCIQDcLvGxX7q0bEdkb-Yjf1kGT3hu8%7E5rfVGe%7EB7z15e%7EzAIhALn5ojBc0z9rhXmlzvyO0nlsIQ4tdbfKJqwd1BluY7lc\u0026Key-Pair-Id=01KXEF4KZ1B6FV465MAWR4M21F\u0026Hash-Algorithm=SHA256 \"HTTP/1.1 206 Partial Content\"\n"}
+,{"stream_name":"stderr","time":109.781899317,"data":"INFO httpx: HTTP Request: GET https://huggingface.co/datasets/isp-uv-es/ClimX/resolve/main/full/NorESM2-MM_r1i1p1f1_with_forcing_test_forcings_ssp245.nc \"HTTP/1.1 302 Found\"\n"}
+,{"stream_name":"stderr","time":109.781950776,"data":"INFO httpx: HTTP Request: GET https://us.gcp.cdn.hf.co/xet-bridge-us/69863056a587f2262539d7ac/70125292d41e94137eddf5d31d9c1d400799a126136c24fb58f8c2f40037f170?X-Xet-Cas-Uid=public\u0026response-content-type=application%2Fx-netcdf\u0026user_id=public\u0026xip=3FjYNAgMBUA\u0026response-content-disposition=inline%3B+filename*%3DUTF-8%27%27NorESM2-MM_r1i1p1f1_with_forcing_test_forcings_ssp245.nc%3B+filename%3D%22NorESM2-MM_r1i1p1f1_with_forcing_test_forcings_ssp245.nc%22%3B\u0026Expires=1794030289\u0026Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly91cy5nY3AuY2RuLmhmLmNvL3hldC1icmlkZ2UtdXMvNjk4NjMwNTZhNTg3ZjIyNjI1MzlkN2FjLzcwMTI1MjkyZDQxZTk0MTM3ZWRkZjVkMzFkOWMxZDQwMDc5OWExMjYxMzZjMjRmYjU4ZjhjMmY0MDAzN2YxNzBcXD9YLVhldC1DYXMtVWlkPXB1YmxpYyZyZXNwb25zZS1jb250ZW50LXR5cGU9KiZ1c2VyX2lkPXB1YmxpYyZ4aXA9M0ZqWU5BZ01CVUEmcmVzcG9uc2UtY29udGVudC1kaXNwb3NpdGlvbj0qIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJFcG9jaFRpbWUiOjE3OTQwMzAyODl9fX1dfQ__\u0026Signature=MEYCIQDcLvGxX7q0bEdkb-Yjf1kGT3hu8%7E5rfVGe%7EB7z15e%7EzAIhALn5ojBc0z9rhXmlzvyO0nlsIQ4tdbfKJqwd1BluY7lc\u0026Key-Pair-Id=01KXEF4KZ1B6FV465MAWR4M21F\u0026Hash-Algorithm=SHA256 \"HTTP/1.1 206 Partial Content\"\n"}
+,{"stream_name":"stderr","time":109.781962437,"data":"\n"}
+,{"stream_name":"stderr","time":109.781966523,"data":"INFO httpx: HTTP Request: GET https://huggingface.co/datasets/isp-uv-es/ClimX/resolve/main/full/NorESM2-MM_r1i1p1f1_with_forcing_test_forcings_ssp245.nc \"HTTP/1.1 302 Found\"\n"}
+,{"stream_name":"stderr","time":109.781972387,"data":"INFO httpx: HTTP Request: GET https://us.gcp.cdn.hf.co/xet-bridge-us/69863056a587f2262539d7ac/70125292d41e94137eddf5d31d9c1d400799a126136c24fb58f8c2f40037f170?X-Xet-Cas-Uid=public\u0026response-content-type=application%2Fx-netcdf\u0026user_id=public\u0026xip=3FjYNAgMBUA\u0026response-content-disposition=inline%3B+filename*%3DUTF-8%27%27NorESM2-MM_r1i1p1f1_with_forcing_test_forcings_ssp245.nc%3B+filename%3D%22NorESM2-MM_r1i1p1f1_with_forcing_test_forcings_ssp245.nc%22%3B\u0026Expires=1794030289\u0026Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly91cy5nY3AuY2RuLmhmLmNvL3hldC1icmlkZ2UtdXMvNjk4NjMwNTZhNTg3ZjIyNjI1MzlkN2FjLzcwMTI1MjkyZDQxZTk0MTM3ZWRkZjVkMzFkOWMxZDQwMDc5OWExMjYxMzZjMjRmYjU4ZjhjMmY0MDAzN2YxNzBcXD9YLVhldC1DYXMtVWlkPXB1YmxpYyZyZXNwb25zZS1jb250ZW50LXR5cGU9KiZ1c2VyX2lkPXB1YmxpYyZ4aXA9M0ZqWU5BZ01CVUEmcmVzcG9uc2UtY29udGVudC1kaXNwb3NpdGlvbj0qIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJFcG9jaFRpbWUiOjE3OTQwMzAyODl9fX1dfQ__\u0026Signature=MEYCIQDcLvGxX7q0bEdkb-Yjf1kGT3hu8%7E5rfVGe%7EB7z15e%7EzAIhALn5ojBc0z9rhXmlzvyO0nlsIQ4tdbfKJqwd1BluY7lc\u0026Key-Pair-Id=01KXEF4KZ1B6FV465MAWR4M21F\u0026Hash-Algorithm=SHA256 \"HTTP/1.1 206 Partial Content\"\n"}
+,{"stream_name":"stderr","time":110.388263057,"data":"INFO fullres_smoke: OK open full-res NetCDFs remotely (8.0 s)\n"}
+,{"stream_name":"stderr","time":110.388542986,"data":"INFO fullres_smoke: train dims: {'forcing_scenario': 2, 'time_year': 86, 'time_month': 1032, 'lat': 192, 'lon': 288, 'time': 120}\n"}
+,{"stream_name":"stderr","time":110.388559925,"data":"INFO fullres_smoke: test dims: {'forcing_scenario': 1, 'time_year': 86, 'time_month': 1032, 'lat': 192, 'lon': 288, 'time': 30}\n"}
+,{"stream_name":"stderr","time":110.388891044,"data":"INFO fullres_smoke: === preprocess_train (full grid, smoke slice) ===\n"}
+,{"stream_name":"stderr","time":110.395453821,"data":"INFO src.data_preprocessing.preprocessing: All forcing variables from config: ['BC_AX', 'BC_N', 'SO2', 'SO4_PR', 'OM_NI', 'CO2_LBC', 'N2O_LBC', 'CH4_LBC', 'CFC11eq_LBC', 'CF2CL2_LBC']\n"}
+,{"stream_name":"stderr","time":110.395487535,"data":"INFO src.data_preprocessing.preprocessing: Available yearly forcings found in dataset: ['CO2_LBC', 'N2O_LBC', 'CH4_LBC', 'CFC11eq_LBC', 'CF2CL2_LBC']\n"}
+,{"stream_name":"stderr","time":110.395492973,"data":"INFO src.data_preprocessing.preprocessing: Available monthly forcings found in dataset: ['BC_AX', 'BC_N', 'SO2', 'SO4_PR', 'OM_NI']\n"}
+,{"stream_name":"stderr","time":110.395497605,"data":"INFO src.data_preprocessing.preprocessing: Available daily forcings found in dataset: []\n"}
+,{"stream_name":"stderr","time":110.395615335,"data":"INFO src.data_preprocessing.preprocessing: Upsampling 'CO2_LBC' from 'time_year' dimension.\n"}
+,{"stream_name":"stderr","time":110.428999477,"data":"INFO src.data_preprocessing.preprocessing: Upsampling 'N2O_LBC' from 'time_year' dimension.\n"}
+,{"stream_name":"stderr","time":110.439547354,"data":"INFO src.data_preprocessing.preprocessing: Upsampling 'CH4_LBC' from 'time_year' dimension.\n"}
+,{"stream_name":"stderr","time":110.450260979,"data":"INFO src.data_preprocessing.preprocessing: Upsampling 'CFC11eq_LBC' from 'time_year' dimension.\n"}
+,{"stream_name":"stderr","time":110.460325596,"data":"INFO src.data_preprocessing.preprocessing: Upsampling 'CF2CL2_LBC' from 'time_year' dimension.\n"}
+,{"stream_name":"stderr","time":110.591222144,"data":"INFO fullres_smoke: OK open full-res NetCDFs remotely (8.0 s)\n"}
+,{"stream_name":"stderr","time":110.591258059,"data":"INFO fullres_smoke: train dims: {'forcing_scenario': 2, 'time_year': 86, 'time_month': 1032, 'lat': 192, 'lon': 288, 'time': 120}\n"}
+,{"stream_name":"stderr","time":110.59126393,"data":"INFO fullres_smoke: test dims: {'forcing_scenario': 1, 'time_year': 86, 'time_month': 1032, 'lat': 192, 'lon': 288, 'time': 30}\n"}
+,{"stream_name":"stderr","time":110.591268637,"data":"INFO fullres_smoke: === preprocess_train (full grid, smoke slice) ===\n"}
+,{"stream_name":"stderr","time":110.591272947,"data":"INFO src.data_preprocessing.preprocessing: All forcing variables from config: ['BC_AX', 'BC_N', 'SO2', 'SO4_PR', 'OM_NI', 'CO2_LBC', 'N2O_LBC', 'CH4_LBC', 'CFC11eq_LBC', 'CF2CL2_LBC']\n"}
+,{"stream_name":"stderr","time":110.591277653,"data":"INFO src.data_preprocessing.preprocessing: Available yearly forcings found in dataset: ['CO2_LBC', 'N2O_LBC', 'CH4_LBC', 'CFC11eq_LBC', 'CF2CL2_LBC']\n"}
+,{"stream_name":"stderr","time":110.591283692,"data":"INFO src.data_preprocessing.preprocessing: Available monthly forcings found in dataset: ['BC_AX', 'BC_N', 'SO2', 'SO4_PR', 'OM_NI']\n"}
+,{"stream_name":"stderr","time":110.59129329,"data":"INFO src.data_preprocessing.preprocessing: Available daily forcings found in dataset: []\n"}
+,{"stream_name":"stderr","time":110.591297957,"data":"INFO src.data_preprocessing.preprocessing: Upsampling 'CO2_LBC' from 'time_year' dimension.\n"}
+,{"stream_name":"stderr","time":110.591300882,"data":"INFO src.data_preprocessing.preprocessing: Upsampling 'N2O_LBC' from 'time_year' dimension.\n"}
+,{"stream_name":"stderr","time":110.591315976,"data":"INFO src.data_preprocessing.preprocessing: Upsampling 'CH4_LBC' from 'time_year' dimension.\n"}
+,{"stream_name":"stderr","time":110.59131893,"data":"INFO src.data_preprocessing.preprocessing: Upsampling 'CFC11eq_LBC' from 'time_year' dimension.\n"}
+,{"stream_name":"stderr","time":110.591321643,"data":"INFO src.data_preprocessing.preprocessing: Upsampling 'CF2CL2_LBC' from 'time_year' dimension.\n"}
+,{"stream_name":"stderr","time":110.591324383,"data":"\n"}
+,{"stream_name":"stderr","time":110.591326933,"data":"INFO fullres_smoke: OK open full-res NetCDFs remotely (8.0 s)\n"}
+,{"stream_name":"stderr","time":110.591329753,"data":"INFO fullres_smoke: train dims: {'forcing_scenario': 2, 'time_year': 86, 'time_month': 1032, 'lat': 192, 'lon': 288, 'time': 120}\n"}
+,{"stream_name":"stderr","time":110.591332629,"data":"INFO fullres_smoke: test dims: {'forcing_scenario': 1, 'time_year': 86, 'time_month': 1032, 'lat': 192, 'lon': 288, 'time': 30}\n"}
+,{"stream_name":"stderr","time":110.591335458,"data":"INFO fullres_smoke: === preprocess_train (full grid, smoke slice) ===\n"}
+,{"stream_name":"stderr","time":110.59133821,"data":"INFO src.data_preprocessing.preprocessing: All forcing variables from config: ['BC_AX', 'BC_N', 'SO2', 'SO4_PR', 'OM_NI', 'CO2_LBC', 'N2O_LBC', 'CH4_LBC', 'CFC11eq_LBC', 'CF2CL2_LBC']\n"}
+,{"stream_name":"stderr","time":110.591342752,"data":"INFO src.data_preprocessing.preprocessing: Available yearly forcings found in dataset: ['CO2_LBC', 'N2O_LBC', 'CH4_LBC', 'CFC11eq_LBC', 'CF2CL2_LBC']\n"}
+,{"stream_name":"stderr","time":110.591345695,"data":"INFO src.data_preprocessing.preprocessing: Available monthly forcings found in dataset: ['BC_AX', 'BC_N', 'SO2', 'SO4_PR', 'OM_NI']\n"}
+,{"stream_name":"stderr","time":110.591348546,"data":"INFO src.data_preprocessing.preprocessing: Available daily forcings found in dataset: []\n"}
+,{"stream_name":"stderr","time":110.591351277,"data":"INFO src.data_preprocessing.preprocessing: Upsampling 'CO2_LBC' from 'time_year' dimension.\n"}
+,{"stream_name":"stderr","time":110.591354121,"data":"INFO src.data_preprocessing.preprocessing: Upsampling 'N2O_LBC' from 'time_year' dimension.\n"}
+,{"stream_name":"stderr","time":110.591356873,"data":"INFO src.data_preprocessing.preprocessing: Upsampling 'CH4_LBC' from 'time_year' dimension.\n"}
+,{"stream_name":"stderr","time":110.591359585,"data":"INFO src.data_preprocessing.preprocessing: Upsampling 'CFC11eq_LBC' from 'time_year' dimension.\n"}
+,{"stream_name":"stderr","time":110.591362327,"data":"INFO src.data_preprocessing.preprocessing: Upsampling 'CF2CL2_LBC' from 'time_year' dimension.\n"}
+,{"stream_name":"stderr","time":111.801651849,"data":"INFO src.data_preprocessing.preprocessing: Variables in X before stationarization: ['BC_AX', 'BC_N', 'CF2CL2_LBC', 'CFC11eq_LBC', 'CH4_LBC', 'CO2_LBC', 'N2O_LBC', 'OM_NI', 'SO2', 'SO4_PR']\n"}
+,{"stream_name":"stderr","time":111.813179481,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed BC_AX with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":111.822881068,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed BC_N with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":111.832674628,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed OM_NI with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":111.850268605,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed SO2 with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":111.86010056,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed SO4_PR with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":111.864745607,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed huss with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":111.869124131,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed pr with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":111.869153049,"data":"INFO src.data_preprocessing.preprocessing: Separating positive/negative values and creating zero masks for aerosol variables...\n"}
+,{"stream_name":"stderr","time":111.869159366,"data":"INFO src.data_preprocessing.preprocessing: BC_AX\n"}
+,{"stream_name":"stderr","time":111.883604047,"data":"INFO src.data_preprocessing.preprocessing: BC_N\n"}
+,{"stream_name":"stderr","time":111.897365046,"data":"INFO src.data_preprocessing.preprocessing: SO2\n"}
+,{"stream_name":"stderr","time":111.911080033,"data":"INFO src.data_preprocessing.preprocessing: SO4_PR\n"}
+,{"stream_name":"stderr","time":111.92516029,"data":"INFO src.data_preprocessing.preprocessing: OM_NI\n"}
+,{"stream_name":"stderr","time":111.939270607,"data":"WARNING src.data_preprocessing.preprocessing: Found 'forcing_scenario' dimension in historical data. Selecting first scenario and dropping dimension.\n"}
+,{"stream_name":"stderr","time":111.965158405,"data":"INFO src.data_preprocessing.preprocessing: Applying log transform to ['pr', 'huss', 'BC_AX', 'BC_N', 'SO2', 'SO4_PR', 'OM_NI']\n"}
+,{"stream_name":"stderr","time":111.970138246,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed pr with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":111.974875034,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed huss with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":111.983473633,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed BC_AX with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":111.991955134,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed BC_N with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.000369276,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed SO2 with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.004394458,"data":"INFO src.data_preprocessing.preprocessing: Variables in X before stationarization: ['BC_AX', 'BC_N', 'CF2CL2_LBC', 'CFC11eq_LBC', 'CH4_LBC', 'CO2_LBC', 'N2O_LBC', 'OM_NI', 'SO2', 'SO4_PR']\n"}
+,{"stream_name":"stderr","time":112.004431786,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed BC_AX with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.004440532,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed BC_N with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.004448056,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed OM_NI with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.00445476,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed SO2 with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.004461703,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed SO4_PR with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.004467516,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed huss with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.004472526,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed pr with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.004477725,"data":"INFO src.data_preprocessing.preprocessing: Separating positive/negative values and creating zero masks for aerosol variables...\n"}
+,{"stream_name":"stderr","time":112.004482983,"data":"INFO src.data_preprocessing.preprocessing: BC_AX\n"}
+,{"stream_name":"stderr","time":112.00448768,"data":"INFO src.data_preprocessing.preprocessing: BC_N\n"}
+,{"stream_name":"stderr","time":112.004514883,"data":"INFO src.data_preprocessing.preprocessing: SO2\n"}
+,{"stream_name":"stderr","time":112.00452127,"data":"INFO src.data_preprocessing.preprocessing: SO4_PR\n"}
+,{"stream_name":"stderr","time":112.004526122,"data":"INFO src.data_preprocessing.preprocessing: OM_NI\n"}
+,{"stream_name":"stderr","time":112.004530918,"data":"WARNING src.data_preprocessing.preprocessing: Found 'forcing_scenario' dimension in historical data. Selecting first scenario and dropping dimension.\n"}
+,{"stream_name":"stderr","time":112.004535796,"data":"INFO src.data_preprocessing.preprocessing: Applying log transform to ['pr', 'huss', 'BC_AX', 'BC_N', 'SO2', 'SO4_PR', 'OM_NI']\n"}
+,{"stream_name":"stderr","time":112.00454081,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed pr with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.004545214,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed huss with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.004550206,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed BC_AX with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.004555024,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed BC_N with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.00456042,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed SO2 with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.004565413,"data":"\n"}
+,{"stream_name":"stderr","time":112.004573059,"data":"INFO src.data_preprocessing.preprocessing: Variables in X before stationarization: ['BC_AX', 'BC_N', 'CF2CL2_LBC', 'CFC11eq_LBC', 'CH4_LBC', 'CO2_LBC', 'N2O_LBC', 'OM_NI', 'SO2', 'SO4_PR']\n"}
+,{"stream_name":"stderr","time":112.004578156,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed BC_AX with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.004583031,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed BC_N with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.004587996,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed OM_NI with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.004592763,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed SO2 with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.004597341,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed SO4_PR with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.004602125,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed huss with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.004606647,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed pr with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.00461137,"data":"INFO src.data_preprocessing.preprocessing: Separating positive/negative values and creating zero masks for aerosol variables...\n"}
+,{"stream_name":"stderr","time":112.00461581,"data":"INFO src.data_preprocessing.preprocessing: BC_AX\n"}
+,{"stream_name":"stderr","time":112.004620598,"data":"INFO src.data_preprocessing.preprocessing: BC_N\n"}
+,{"stream_name":"stderr","time":112.004625245,"data":"INFO src.data_preprocessing.preprocessing: SO2\n"}
+,{"stream_name":"stderr","time":112.004629921,"data":"INFO src.data_preprocessing.preprocessing: SO4_PR\n"}
+,{"stream_name":"stderr","time":112.004634613,"data":"INFO src.data_preprocessing.preprocessing: OM_NI\n"}
+,{"stream_name":"stderr","time":112.004639191,"data":"WARNING src.data_preprocessing.preprocessing: Found 'forcing_scenario' dimension in historical data. Selecting first scenario and dropping dimension.\n"}
+,{"stream_name":"stderr","time":112.004672354,"data":"INFO src.data_preprocessing.preprocessing: Applying log transform to ['pr', 'huss', 'BC_AX', 'BC_N', 'SO2', 'SO4_PR', 'OM_NI']\n"}
+,{"stream_name":"stderr","time":112.004685076,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed pr with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.004690516,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed huss with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.004695417,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed BC_AX with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.004714208,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed BC_N with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.004719193,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed SO2 with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.009743343,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed SO4_PR with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.018576704,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed OM_NI with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.018610491,"data":"INFO src.data_preprocessing.preprocessing_utils: Computing monthly climatology (mean and std)...\n"}
+,{"stream_name":"stderr","time":112.21246088,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed SO4_PR with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.212501291,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed OM_NI with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.212508118,"data":"INFO src.data_preprocessing.preprocessing_utils: Computing monthly climatology (mean and std)...\n"}
+,{"stream_name":"stderr","time":112.21251371,"data":"\n"}
+,{"stream_name":"stderr","time":112.212517943,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed SO4_PR with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.212522545,"data":"INFO src.data_preprocessing.preprocessing_utils: Log-transformed OM_NI with epsilon=1e-06\n"}
+,{"stream_name":"stderr","time":112.212527367,"data":"INFO src.data_preprocessing.preprocessing_utils: Computing monthly climatology (mean and std)...\n"}
+,{"stream_name":"stderr","time":112.619918763,"data":"INFO src.data_preprocessing.preprocessing: Computing monthly climatology for daily forcing variables...\n"}
+,{"stream_name":"stderr","time":112.620290709,"data":"INFO src.data_preprocessing.preprocessing_utils: Computing monthly climatology (mean and std)...\n"}
+,{"stream_name":"stderr","time":112.620689787,"data":"ERROR fullres_smoke: FAILED preprocess_train (full grid, smoke slice): KeyError(\"No variable named 'time.month'. Variables on the dataset include ['BC_AX', 'BC_N', 'SO2', 'SO4_PR', 'OM_NI', ..., 'CH4_LBC', 'CFC11eq_LBC', 'CF2CL2_LBC', 'lat', 'lon']\")\n"}
+,{"stream_name":"stderr","time":112.624987431,"data":"Traceback (most recent call last):\n"}
+,{"stream_name":"stderr","time":112.625404783,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/core/dataset.py\", line 1231, in _construct_dataarray\n"}
+,{"stream_name":"stderr","time":112.625422643,"data":"    variable = self._variables[name]\n"}
+,{"stream_name":"stderr","time":112.625427856,"data":"               ~~~~~~~~~~~~~~~^^^^^^\n"}
+,{"stream_name":"stderr","time":112.625432596,"data":"KeyError: 'time.month'\n"}
+,{"stream_name":"stderr","time":112.625436765,"data":"\n"}
+,{"stream_name":"stderr","time":112.625441692,"data":"During handling of the above exception, another exception occurred:\n"}
+,{"stream_name":"stderr","time":112.62544656,"data":"\n"}
+,{"stream_name":"stderr","time":112.625450637,"data":"Traceback (most recent call last):\n"}
+,{"stream_name":"stderr","time":112.626162729,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/core/dataset.py\", line 1338, in __getitem__\n"}
+,{"stream_name":"stderr","time":112.626184441,"data":"    return self._construct_dataarray(key)\n"}
+,{"stream_name":"stderr","time":112.626189953,"data":"           ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^\n"}
+,{"stream_name":"stderr","time":112.626194307,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/core/dataset.py\", line 1233, in _construct_dataarray\n"}
+,{"stream_name":"stderr","time":112.626199077,"data":"    _, name, variable = _get_virtual_variable(self._variables, name, self.sizes)\n"}
+,{"stream_name":"stderr","time":112.626203688,"data":"                        ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.626207881,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/core/dataset_utils.py\", line 82, in _get_virtual_variable\n"}
+,{"stream_name":"stderr","time":112.626212784,"data":"    ref_var = variables[ref_name]\n"}
+,{"stream_name":"stderr","time":112.626217101,"data":"              ~~~~~~~~~^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.626221395,"data":"KeyError: 'time'\n"}
+,{"stream_name":"stderr","time":112.626225547,"data":"\n"}
+,{"stream_name":"stderr","time":112.626229618,"data":"The above exception was the direct cause of the following exception:\n"}
+,{"stream_name":"stderr","time":112.626234531,"data":"\n"}
+,{"stream_name":"stderr","time":112.626238636,"data":"Traceback (most recent call last):\n"}
+,{"stream_name":"stderr","time":112.628342965,"data":"  File \"/kaggle/working/climx/scripts/fullres_smoke.py\", line 55, in \u003cmodule\u003e\n"}
+,{"stream_name":"stderr","time":112.628362912,"data":"    X_train, y_train, metadata = stage(\n"}
+,{"stream_name":"stderr","time":112.628373835,"data":"                                 ~~~~~^\n"}
+,{"stream_name":"stderr","time":112.628376736,"data":"        \"preprocess_train (full grid, smoke slice)\",\n"}
+,{"stream_name":"stderr","time":112.628379565,"data":"        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.628382273,"data":"        lambda: preprocess.run_preprocess_train(\n"}
+,{"stream_name":"stderr","time":112.628384835,"data":"        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.628387518,"data":"            ds, version=\"full\", load_into_memory=False))\n"}
+,{"stream_name":"stderr","time":112.628390257,"data":"            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.628392886,"data":"  File \"/kaggle/working/climx/scripts/fullres_smoke.py\", line 37, in stage\n"}
+,{"stream_name":"stderr","time":112.628395666,"data":"    out = fn()\n"}
+,{"stream_name":"stderr","time":112.628398269,"data":"  File \"/kaggle/working/climx/scripts/fullres_smoke.py\", line 57, in \u003clambda\u003e\n"}
+,{"stream_name":"stderr","time":112.628401092,"data":"    lambda: preprocess.run_preprocess_train(\n"}
+,{"stream_name":"stderr","time":112.628403643,"data":"            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^\n"}
+,{"stream_name":"stderr","time":112.628406165,"data":"        ds, version=\"full\", load_into_memory=False))\n"}
+,{"stream_name":"stderr","time":112.628408863,"data":"        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.62841148,"data":"  File \"/kaggle/working/climx/src/climx_project/preprocess.py\", line 54, in run_preprocess_train\n"}
+,{"stream_name":"stderr","time":112.628414213,"data":"    X_train, y_train, metadata = preprocess_train(\n"}
+,{"stream_name":"stderr","time":112.628416758,"data":"                                 ~~~~~~~~~~~~~~~~^\n"}
+,{"stream_name":"stderr","time":112.628432712,"data":"        dataset,\n"}
+,{"stream_name":"stderr","time":112.628435384,"data":"        ^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.628438016,"data":"    ...\u003c4 lines\u003e...\n"}
+,{"stream_name":"stderr","time":112.62844064,"data":"        stationarization_mode=stationarization_mode,\n"}
+,{"stream_name":"stderr","time":112.62844329,"data":"        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.628445856,"data":"    )\n"}
+,{"stream_name":"stderr","time":112.62844841,"data":"    ^\n"}
+,{"stream_name":"stderr","time":112.62845094,"data":"  File \"/kaggle/working/climx/third_party/climx/src/data_preprocessing/preprocessing.py\", line 182, in preprocess_train\n"}
+,{"stream_name":"stderr","time":112.62845393,"data":"    forcing_climatology = compute_climatology(forcing_ds, 'monthly')\n"}
+,{"stream_name":"stderr","time":112.6284566,"data":"  File \"/kaggle/working/climx/third_party/climx/src/data_preprocessing/preprocessing_utils.py\", line 212, in compute_climatology\n"}
+,{"stream_name":"stderr","time":112.628459413,"data":"    climatology_mean = ds.groupby('time.month').mean('time')\n"}
+,{"stream_name":"stderr","time":112.628462,"data":"                       ~~~~~~~~~~^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.628464662,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/util/deprecation_helpers.py\", line 119, in inner\n"}
+,{"stream_name":"stderr","time":112.628467993,"data":"    return func(*args, **kwargs)\n"}
+,{"stream_name":"stderr","time":112.628470598,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/core/dataset.py\", line 10095, in groupby\n"}
+,{"stream_name":"stderr","time":112.628473329,"data":"    rgroupers = _parse_group_and_groupers(\n"}
+,{"stream_name":"stderr","time":112.62847604,"data":"        self, group, groupers, eagerly_compute_group=eagerly_compute_group\n"}
+,{"stream_name":"stderr","time":112.628478707,"data":"    )\n"}
+,{"stream_name":"stderr","time":112.628481798,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/core/groupby.py\", line 437, in _parse_group_and_groupers\n"}
+,{"stream_name":"stderr","time":112.628484595,"data":"    rgroupers = tuple(\n"}
+,{"stream_name":"stderr","time":112.628487206,"data":"        ResolvedGrouper(\n"}
+,{"stream_name":"stderr","time":112.628489728,"data":"    ...\u003c2 lines\u003e...\n"}
+,{"stream_name":"stderr","time":112.628492326,"data":"        for group, grouper in grouper_mapping.items()\n"}
+,{"stream_name":"stderr","time":112.628494953,"data":"    )\n"}
+,{"stream_name":"stderr","time":112.628497497,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/core/groupby.py\", line 438, in \u003cgenexpr\u003e\n"}
+,{"stream_name":"stderr","time":112.628500327,"data":"    ResolvedGrouper(\n"}
+,{"stream_name":"stderr","time":112.628503329,"data":"    ~~~~~~~~~~~~~~~^\n"}
+,{"stream_name":"stderr","time":112.628505828,"data":"        grouper, group, obj, eagerly_compute_group=eagerly_compute_group\n"}
+,{"stream_name":"stderr","time":112.628508439,"data":"        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.628511063,"data":"    )\n"}
+,{"stream_name":"stderr","time":112.628513513,"data":"    ^\n"}
+,{"stream_name":"stderr","time":112.628516039,"data":"  File \"\u003cstring\u003e\", line 7, in __init__\n"}
+,{"stream_name":"stderr","time":112.628529702,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/core/groupby.py\", line 331, in __post_init__\n"}
+,{"stream_name":"stderr","time":112.628532735,"data":"    self.group = _resolve_group(self.obj, self.group)\n"}
+,{"stream_name":"stderr","time":112.628538719,"data":"                 ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.628541359,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/core/groupby.py\", line 497, in _resolve_group\n"}
+,{"stream_name":"stderr","time":112.628544091,"data":"    group_da: DataArray = obj[group]\n"}
+,{"stream_name":"stderr","time":112.628546635,"data":"                          ~~~^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.6285492,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/core/dataset.py\", line 1351, in __getitem__\n"}
+,{"stream_name":"stderr","time":112.628551925,"data":"    raise KeyError(message) from e\n"}
+,{"stream_name":"stderr","time":112.6285545,"data":"KeyError: \"No variable named 'time.month'. Variables on the dataset include ['BC_AX', 'BC_N', 'SO2', 'SO4_PR', 'OM_NI', ..., 'CH4_LBC', 'CFC11eq_LBC', 'CF2CL2_LBC', 'lat', 'lon']\"\n"}
+,{"stream_name":"stderr","time":112.822935861,"data":"INFO src.data_preprocessing.preprocessing: Computing monthly climatology for daily forcing variables...\n"}
+,{"stream_name":"stderr","time":112.822973151,"data":"INFO src.data_preprocessing.preprocessing_utils: Computing monthly climatology (mean and std)...\n"}
+,{"stream_name":"stderr","time":112.822983515,"data":"ERROR fullres_smoke: FAILED preprocess_train (full grid, smoke slice): KeyError(\"No variable named 'time.month'. Variables on the dataset include ['BC_AX', 'BC_N', 'SO2', 'SO4_PR', 'OM_NI', ..., 'CH4_LBC', 'CFC11eq_LBC', 'CF2CL2_LBC', 'lat', 'lon']\")\n"}
+,{"stream_name":"stderr","time":112.822987144,"data":"Traceback (most recent call last):\n"}
+,{"stream_name":"stderr","time":112.82299002,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/core/dataset.py\", line 1231, in _construct_dataarray\n"}
+,{"stream_name":"stderr","time":112.822993073,"data":"    variable = self._variables[name]\n"}
+,{"stream_name":"stderr","time":112.822995829,"data":"               ~~~~~~~~~~~~~~~^^^^^^\n"}
+,{"stream_name":"stderr","time":112.822998569,"data":"KeyError: 'time.month'\n"}
+,{"stream_name":"stderr","time":112.823001223,"data":"\n"}
+,{"stream_name":"stderr","time":112.823003873,"data":"During handling of the above exception, another exception occurred:\n"}
+,{"stream_name":"stderr","time":112.823006636,"data":"\n"}
+,{"stream_name":"stderr","time":112.823009135,"data":"Traceback (most recent call last):\n"}
+,{"stream_name":"stderr","time":112.823011821,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/core/dataset.py\", line 1338, in __getitem__\n"}
+,{"stream_name":"stderr","time":112.823014736,"data":"    return self._construct_dataarray(key)\n"}
+,{"stream_name":"stderr","time":112.823017395,"data":"           ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^\n"}
+,{"stream_name":"stderr","time":112.823020083,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/core/dataset.py\", line 1233, in _construct_dataarray\n"}
+,{"stream_name":"stderr","time":112.823022935,"data":"    _, name, variable = _get_virtual_variable(self._variables, name, self.sizes)\n"}
+,{"stream_name":"stderr","time":112.823025758,"data":"                        ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.823028484,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/core/dataset_utils.py\", line 82, in _get_virtual_variable\n"}
+,{"stream_name":"stderr","time":112.823031455,"data":"    ref_var = variables[ref_name]\n"}
+,{"stream_name":"stderr","time":112.823034168,"data":"              ~~~~~~~~~^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.823043174,"data":"KeyError: 'time'\n"}
+,{"stream_name":"stderr","time":112.823057247,"data":"\n"}
+,{"stream_name":"stderr","time":112.823059978,"data":"The above exception was the direct cause of the following exception:\n"}
+,{"stream_name":"stderr","time":112.82306273,"data":"\n"}
+,{"stream_name":"stderr","time":112.823065226,"data":"Traceback (most recent call last):\n"}
+,{"stream_name":"stderr","time":112.823067891,"data":"  File \"/kaggle/working/climx/scripts/fullres_smoke.py\", line 55, in \u003cmodule\u003e\n"}
+,{"stream_name":"stderr","time":112.823071134,"data":"    X_train, y_train, metadata = stage(\n"}
+,{"stream_name":"stderr","time":112.823073807,"data":"                                 ~~~~~^\n"}
+,{"stream_name":"stderr","time":112.823076395,"data":"        \"preprocess_train (full grid, smoke slice)\",\n"}
+,{"stream_name":"stderr","time":112.823079149,"data":"        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.823081817,"data":"        lambda: preprocess.run_preprocess_train(\n"}
+,{"stream_name":"stderr","time":112.823084463,"data":"        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.823087161,"data":"            ds, version=\"full\", load_into_memory=False))\n"}
+,{"stream_name":"stderr","time":112.823089982,"data":"            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.823094521,"data":"  File \"/kaggle/working/climx/scripts/fullres_smoke.py\", line 37, in stage\n"}
+,{"stream_name":"stderr","time":112.823097507,"data":"    out = fn()\n"}
+,{"stream_name":"stderr","time":112.823100282,"data":"  File \"/kaggle/working/climx/scripts/fullres_smoke.py\", line 57, in \u003clambda\u003e\n"}
+,{"stream_name":"stderr","time":112.823103135,"data":"    lambda: preprocess.run_preprocess_train(\n"}
+,{"stream_name":"stderr","time":112.823105795,"data":"            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^\n"}
+,{"stream_name":"stderr","time":112.823108415,"data":"        ds, version=\"full\", load_into_memory=False))\n"}
+,{"stream_name":"stderr","time":112.823111275,"data":"        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.823113978,"data":"  File \"/kaggle/working/climx/src/climx_project/preprocess.py\", line 54, in run_preprocess_train\n"}
+,{"stream_name":"stderr","time":112.82311681,"data":"    X_train, y_train, metadata = preprocess_train(\n"}
+,{"stream_name":"stderr","time":112.823119452,"data":"                                 ~~~~~~~~~~~~~~~~^\n"}
+,{"stream_name":"stderr","time":112.823122187,"data":"        dataset,\n"}
+,{"stream_name":"stderr","time":112.823124791,"data":"        ^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.823127392,"data":"    ...\u003c4 lines\u003e...\n"}
+,{"stream_name":"stderr","time":112.82313018400001,"data":"        stationarization_mode=stationarization_mode,\n"}
+,{"stream_name":"stderr","time":112.823132984,"data":"        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.823135655,"data":"    )\n"}
+,{"stream_name":"stderr","time":112.823138241,"data":"    ^\n"}
+,{"stream_name":"stderr","time":112.823140818,"data":"  File \"/kaggle/working/climx/third_party/climx/src/data_preprocessing/preprocessing.py\", line 182, in preprocess_train\n"}
+,{"stream_name":"stderr","time":112.823143726,"data":"    forcing_climatology = compute_climatology(forcing_ds, 'monthly')\n"}
+,{"stream_name":"stderr","time":112.823147033,"data":"  File \"/kaggle/working/climx/third_party/climx/src/data_preprocessing/preprocessing_utils.py\", line 212, in compute_climatology\n"}
+,{"stream_name":"stderr","time":112.823149985,"data":"    climatology_mean = ds.groupby('time.month').mean('time')\n"}
+,{"stream_name":"stderr","time":112.823155665,"data":"                       ~~~~~~~~~~^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.823158432,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/util/deprecation_helpers.py\", line 119, in inner\n"}
+,{"stream_name":"stderr","time":112.823161282,"data":"    return func(*args, **kwargs)\n"}
+,{"stream_name":"stderr","time":112.823163913,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/core/dataset.py\", line 10095, in groupby\n"}
+,{"stream_name":"stderr","time":112.823166775,"data":"    rgroupers = _parse_group_and_groupers(\n"}
+,{"stream_name":"stderr","time":112.82316944,"data":"        self, group, groupers, eagerly_compute_group=eagerly_compute_group\n"}
+,{"stream_name":"stderr","time":112.823172243,"data":"    )\n"}
+,{"stream_name":"stderr","time":112.823174809,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/core/groupby.py\", line 437, in _parse_group_and_groupers\n"}
+,{"stream_name":"stderr","time":112.823177704,"data":"    rgroupers = tuple(\n"}
+,{"stream_name":"stderr","time":112.823180332,"data":"        ResolvedGrouper(\n"}
+,{"stream_name":"stderr","time":112.823182976,"data":"    ...\u003c2 lines\u003e...\n"}
+,{"stream_name":"stderr","time":112.82318567,"data":"        for group, grouper in grouper_mapping.items()\n"}
+,{"stream_name":"stderr","time":112.823188349,"data":"    )\n"}
+,{"stream_name":"stderr","time":112.823190901,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/core/groupby.py\", line 438, in \u003cgenexpr\u003e\n"}
+,{"stream_name":"stderr","time":112.823193977,"data":"    ResolvedGrouper(\n"}
+,{"stream_name":"stderr","time":112.823196631,"data":"    ~~~~~~~~~~~~~~~^\n"}
+,{"stream_name":"stderr","time":112.823199223,"data":"        grouper, group, obj, eagerly_compute_group=eagerly_compute_group\n"}
+,{"stream_name":"stderr","time":112.823201949,"data":"        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.823204662,"data":"    )\n"}
+,{"stream_name":"stderr","time":112.823207203,"data":"    ^\n"}
+,{"stream_name":"stderr","time":112.823210118,"data":"  File \"\u003cstring\u003e\", line 7, in __init__\n"}
+,{"stream_name":"stderr","time":112.823212969,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/core/groupby.py\", line 331, in __post_init__\n"}
+,{"stream_name":"stderr","time":112.823215811,"data":"    self.group = _resolve_group(self.obj, self.group)\n"}
+,{"stream_name":"stderr","time":112.823218477,"data":"                 ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.823221122,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/core/groupby.py\", line 497, in _resolve_group\n"}
+,{"stream_name":"stderr","time":112.823223952,"data":"    group_da: DataArray = obj[group]\n"}
+,{"stream_name":"stderr","time":112.823226569,"data":"                          ~~~^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.823229195,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/core/dataset.py\", line 1351, in __getitem__\n"}
+,{"stream_name":"stderr","time":112.823232035,"data":"    raise KeyError(message) from e\n"}
+,{"stream_name":"stderr","time":112.823234711,"data":"KeyError: \"No variable named 'time.month'. Variables on the dataset include ['BC_AX', 'BC_N', 'SO2', 'SO4_PR', 'OM_NI', ..., 'CH4_LBC', 'CFC11eq_LBC', 'CF2CL2_LBC', 'lat', 'lon']\"\n"}
+,{"stream_name":"stderr","time":112.823237791,"data":"\n"}
+,{"stream_name":"stderr","time":112.823240308,"data":"INFO src.data_preprocessing.preprocessing: Computing monthly climatology for daily forcing variables...\n"}
+,{"stream_name":"stderr","time":112.82324535,"data":"INFO src.data_preprocessing.preprocessing_utils: Computing monthly climatology (mean and std)...\n"}
+,{"stream_name":"stderr","time":112.823248298,"data":"ERROR fullres_smoke: FAILED preprocess_train (full grid, smoke slice): KeyError(\"No variable named 'time.month'. Variables on the dataset include ['BC_AX', 'BC_N', 'SO2', 'SO4_PR', 'OM_NI', ..., 'CH4_LBC', 'CFC11eq_LBC', 'CF2CL2_LBC', 'lat', 'lon']\")\n"}
+,{"stream_name":"stderr","time":112.823251494,"data":"Traceback (most recent call last):\n"}
+,{"stream_name":"stderr","time":112.823254127,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/core/dataset.py\", line 1231, in _construct_dataarray\n"}
+,{"stream_name":"stderr","time":112.823256969,"data":"    variable = self._variables[name]\n"}
+,{"stream_name":"stderr","time":112.823259603,"data":"               ~~~~~~~~~~~~~~~^^^^^^\n"}
+,{"stream_name":"stderr","time":112.823262229,"data":"KeyError: 'time.month'\n"}
+,{"stream_name":"stderr","time":112.823264841,"data":"\n"}
+,{"stream_name":"stderr","time":112.823267336,"data":"During handling of the above exception, another exception occurred:\n"}
+,{"stream_name":"stderr","time":112.823270069,"data":"\n"}
+,{"stream_name":"stderr","time":112.823272553,"data":"Traceback (most recent call last):\n"}
+,{"stream_name":"stderr","time":112.823275162,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/core/dataset.py\", line 1338, in __getitem__\n"}
+,{"stream_name":"stderr","time":112.823277984,"data":"    return self._construct_dataarray(key)\n"}
+,{"stream_name":"stderr","time":112.823280659,"data":"           ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^\n"}
+,{"stream_name":"stderr","time":112.823283301,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/core/dataset.py\", line 1233, in _construct_dataarray\n"}
+,{"stream_name":"stderr","time":112.823286166,"data":"    _, name, variable = _get_virtual_variable(self._variables, name, self.sizes)\n"}
+,{"stream_name":"stderr","time":112.823288892,"data":"                        ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.823292225,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/core/dataset_utils.py\", line 82, in _get_virtual_variable\n"}
+,{"stream_name":"stderr","time":112.823295297,"data":"    ref_var = variables[ref_name]\n"}
+,{"stream_name":"stderr","time":112.823297918,"data":"              ~~~~~~~~~^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.823300555,"data":"KeyError: 'time'\n"}
+,{"stream_name":"stderr","time":112.823303238,"data":"\n"}
+,{"stream_name":"stderr","time":112.823305732,"data":"The above exception was the direct cause of the following exception:\n"}
+,{"stream_name":"stderr","time":112.823308431,"data":"\n"}
+,{"stream_name":"stderr","time":112.823310924,"data":"Traceback (most recent call last):\n"}
+,{"stream_name":"stderr","time":112.823313567,"data":"  File \"/kaggle/working/climx/scripts/fullres_smoke.py\", line 55, in \u003cmodule\u003e\n"}
+,{"stream_name":"stderr","time":112.823316446,"data":"    X_train, y_train, metadata = stage(\n"}
+,{"stream_name":"stderr","time":112.823319092,"data":"                                 ~~~~~^\n"}
+,{"stream_name":"stderr","time":112.82332173,"data":"        \"preprocess_train (full grid, smoke slice)\",\n"}
+,{"stream_name":"stderr","time":112.823324474,"data":"        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.823327325,"data":"        lambda: preprocess.run_preprocess_train(\n"}
+,{"stream_name":"stderr","time":112.823330176,"data":"        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.823332823,"data":"            ds, version=\"full\", load_into_memory=False))\n"}
+,{"stream_name":"stderr","time":112.823338039,"data":"            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.823340901,"data":"  File \"/kaggle/working/climx/scripts/fullres_smoke.py\", line 37, in stage\n"}
+,{"stream_name":"stderr","time":112.823344103,"data":"    out = fn()\n"}
+,{"stream_name":"stderr","time":112.823346716,"data":"  File \"/kaggle/working/climx/scripts/fullres_smoke.py\", line 57, in \u003clambda\u003e\n"}
+,{"stream_name":"stderr","time":112.823349574,"data":"    lambda: preprocess.run_preprocess_train(\n"}
+,{"stream_name":"stderr","time":112.823352283,"data":"            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^\n"}
+,{"stream_name":"stderr","time":112.823355002,"data":"        ds, version=\"full\", load_into_memory=False))\n"}
+,{"stream_name":"stderr","time":112.823357739,"data":"        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.823360444,"data":"  File \"/kaggle/working/climx/src/climx_project/preprocess.py\", line 54, in run_preprocess_train\n"}
+,{"stream_name":"stderr","time":112.823363289,"data":"    X_train, y_train, metadata = preprocess_train(\n"}
+,{"stream_name":"stderr","time":112.823366069,"data":"                                 ~~~~~~~~~~~~~~~~^\n"}
+,{"stream_name":"stderr","time":112.82336881,"data":"        dataset,\n"}
+,{"stream_name":"stderr","time":112.82337139,"data":"        ^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.823373975,"data":"    ...\u003c4 lines\u003e...\n"}
+,{"stream_name":"stderr","time":112.823376728,"data":"        stationarization_mode=stationarization_mode,\n"}
+,{"stream_name":"stderr","time":112.823379369,"data":"        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.823382222,"data":"    )\n"}
+,{"stream_name":"stderr","time":112.823384856,"data":"    ^\n"}
+,{"stream_name":"stderr","time":112.823387482,"data":"  File \"/kaggle/working/climx/third_party/climx/src/data_preprocessing/preprocessing.py\", line 182, in preprocess_train\n"}
+,{"stream_name":"stderr","time":112.82339053,"data":"    forcing_climatology = compute_climatology(forcing_ds, 'monthly')\n"}
+,{"stream_name":"stderr","time":112.823393278,"data":"  File \"/kaggle/working/climx/third_party/climx/src/data_preprocessing/preprocessing_utils.py\", line 212, in compute_climatology\n"}
+,{"stream_name":"stderr","time":112.823396163,"data":"    climatology_mean = ds.groupby('time.month').mean('time')\n"}
+,{"stream_name":"stderr","time":112.823398832,"data":"                       ~~~~~~~~~~^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.823401494,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/util/deprecation_helpers.py\", line 119, in inner\n"}
+,{"stream_name":"stderr","time":112.823404364,"data":"    return func(*args, **kwargs)\n"}
+,{"stream_name":"stderr","time":112.82340741,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/core/dataset.py\", line 10095, in groupby\n"}
+,{"stream_name":"stderr","time":112.823410278,"data":"    rgroupers = _parse_group_and_groupers(\n"}
+,{"stream_name":"stderr","time":112.823412942,"data":"        self, group, groupers, eagerly_compute_group=eagerly_compute_group\n"}
+,{"stream_name":"stderr","time":112.823415684,"data":"    )\n"}
+,{"stream_name":"stderr","time":112.823418267,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/core/groupby.py\", line 437, in _parse_group_and_groupers\n"}
+,{"stream_name":"stderr","time":112.823421148,"data":"    rgroupers = tuple(\n"}
+,{"stream_name":"stderr","time":112.823424001,"data":"        ResolvedGrouper(\n"}
+,{"stream_name":"stderr","time":112.823428896,"data":"    ...\u003c2 lines\u003e...\n"}
+,{"stream_name":"stderr","time":112.823431604,"data":"        for group, grouper in grouper_mapping.items()\n"}
+,{"stream_name":"stderr","time":112.823434298,"data":"    )\n"}
+,{"stream_name":"stderr","time":112.823436855,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/core/groupby.py\", line 438, in \u003cgenexpr\u003e\n"}
+,{"stream_name":"stderr","time":112.823439738,"data":"    ResolvedGrouper(\n"}
+,{"stream_name":"stderr","time":112.823442321,"data":"    ~~~~~~~~~~~~~~~^\n"}
+,{"stream_name":"stderr","time":112.823444918,"data":"        grouper, group, obj, eagerly_compute_group=eagerly_compute_group\n"}
+,{"stream_name":"stderr","time":112.823447679,"data":"        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.823450399,"data":"    )\n"}
+,{"stream_name":"stderr","time":112.823452929,"data":"    ^\n"}
+,{"stream_name":"stderr","time":112.823455484,"data":"  File \"\u003cstring\u003e\", line 7, in __init__\n"}
+,{"stream_name":"stderr","time":112.823458318,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/core/groupby.py\", line 331, in __post_init__\n"}
+,{"stream_name":"stderr","time":112.82346118,"data":"    self.group = _resolve_group(self.obj, self.group)\n"}
+,{"stream_name":"stderr","time":112.823463866,"data":"                 ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.82346654,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/core/groupby.py\", line 497, in _resolve_group\n"}
+,{"stream_name":"stderr","time":112.823469398,"data":"    group_da: DataArray = obj[group]\n"}
+,{"stream_name":"stderr","time":112.823472015,"data":"                          ~~~^^^^^^^\n"}
+,{"stream_name":"stderr","time":112.823474666,"data":"  File \"/usr/local/lib/python3.13/dist-packages/xarray/core/dataset.py\", line 1351, in __getitem__\n"}
+,{"stream_name":"stderr","time":112.823495398,"data":"    raise KeyError(message) from e\n"}
+,{"stream_name":"stderr","time":112.823498141,"data":"KeyError: \"No variable named 'time.month'. Variables on the dataset include ['BC_AX', 'BC_N', 'SO2', 'SO4_PR', 'OM_NI', ..., 'CH4_LBC', 'CFC11eq_LBC', 'CF2CL2_LBC', 'lat', 'lon']\"\n"}
+,{"stream_name":"stdout","time":119.92997311,"data":"smoke exit code: 1\n"}
+,{"stream_name":"stderr","time":119.938048926,"data":"/usr/local/lib/python3.13/dist-packages/IPython/core/interactiveshell.py:3561: UserWarning: To exit: use 'exit', 'quit', or Ctrl-D.\n"}
+,{"stream_name":"stderr","time":119.938083619,"data":"  warn(\"To exit: use 'exit', 'quit', or Ctrl-D.\", stacklevel=1)\n"}
+,{"stream_name":"stderr","time":119.938089623,"data":"\n"}
+,{"stream_name":"stderr","time":119.93809431,"data":"/usr/local/lib/python3.13/dist-packages/IPython/core/interactiveshell.py:3561: UserWarning: To exit: use 'exit', 'quit', or Ctrl-D.\n"}
+,{"stream_name":"stderr","time":119.938099411,"data":"  warn(\"To exit: use 'exit', 'quit', or Ctrl-D.\", stacklevel=1)\n"}
+,{"stream_name":"stderr","time":120.365953042,"data":"Traceback (most recent call last):\n"}
+,{"stream_name":"stderr","time":120.366658498,"data":"  File \"\u003cstring\u003e\", line 1, in \u003cmodule\u003e\n"}
+,{"stream_name":"stderr","time":120.366671121,"data":"    import sys;import papermill as pm;pm.execute_notebook(\"__notebook__.ipynb\",\"__notebook__.ipynb\",progress_bar=False,log_output=True,stdout_file=sys.stdout,stderr_file=sys.stderr,allow_errors=False,timeout=43200)\n"}
+,{"stream_name":"stderr","time":120.366677108,"data":"                                      ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":120.366699272,"data":"  File \"/usr/local/lib/python3.13/dist-packages/papermill/execute.py\", line 131, in execute_notebook\n"}
+,{"stream_name":"stderr","time":120.366703312,"data":"    raise_for_execution_errors(nb, output_path)\n"}
+,{"stream_name":"stderr","time":120.366706215,"data":"    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^\n"}
+,{"stream_name":"stderr","time":120.366721403,"data":"  File \"/usr/local/lib/python3.13/dist-packages/papermill/execute.py\", line 251, in raise_for_execution_errors\n"}
+,{"stream_name":"stderr","time":120.366724486,"data":"    raise error\n"}
+,{"stream_name":"stderr","time":120.366727047,"data":"papermill.exceptions.PapermillExecutionError: \n"}
+,{"stream_name":"stderr","time":120.366729639,"data":"---------------------------------------------------------------------------\n"}
+,{"stream_name":"stderr","time":120.36673234,"data":"Exception encountered at \"In [2]\":\n"}
+,{"stream_name":"stderr","time":120.366735293,"data":"An exception has occurred, use %tb to see the full traceback.\n"}
+,{"stream_name":"stderr","time":120.366737968,"data":"\n"}
+,{"stream_name":"stderr","time":120.366740442,"data":"SystemExit: fullres smoke FAILED — see log above\n"}
+,{"stream_name":"stderr","time":120.366743896,"data":"\n"}
+,{"stream_name":"stderr","time":120.366746317,"data":"\n"}
+,{"stream_name":"stderr","time":123.257513331,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":123.257549827,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":123.481616029,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":123.48164665,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":124.465892788,"data":"[NbConvertApp] Converting notebook __notebook__.ipynb to notebook\n"}
+,{"stream_name":"stderr","time":124.555521291,"data":"[NbConvertApp] Writing 21533 bytes to __notebook__.ipynb\n"}
+,{"stream_name":"stderr","time":127.823181067,"data":"[NbConvertApp] Converting notebook __notebook__.ipynb to html\n"}
+,{"stream_name":"stderr","time":128.454649738,"data":"[NbConvertApp] Writing 296400 bytes to __results__.html\n"}
+]

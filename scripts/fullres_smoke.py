@@ -42,9 +42,10 @@ def stage(name, fn):
     return out
 
 
-# 1. Remote open (slices: 120 days x 2 train scenarios, 30 test days).
+# 1. Remote open (slices: 400 days x 2 train scenarios, 30 test days).
+# 400 days >= one full year: monthly_climatology_to_daily needs months 1..12.
 ds = stage("open full-res NetCDFs remotely", lambda: open_full_datasets(
-    train_days=120, test_days=30))
+    train_days=400, test_days=30))
 log.info("train dims: %s", dict(ds.train.sizes))
 log.info("test dims: %s", dict(ds.test_forcings.sizes))
 
@@ -84,12 +85,15 @@ y_pred = stage("predict 30-day test slice", lambda: emulator.predict(
     X_test, target_vars=paths.TARGET_VARIABLES))
 log.info("prediction: %s", {v: tuple(y_pred[v].shape) for v in list(y_pred.data_vars)[:2]})
 
-# 6. Preprocessing reversal + index computation, end to end.
-stage("evaluate tail (reversal + indices)", lambda: emulator.evaluate(
+# 6. Preprocessing reversal end to end (indices OFF: the 30-day smoke slice
+# cannot satisfy the percentile indices' 1961-1990 base period anyway — the
+# reversal is what this stage proves).
+y_phys, _ = stage("evaluate tail (preprocessing reversal)", lambda: emulator.evaluate(
     X_test, metadata_test,
     results_path=paths.INDICES_DIR / "fullres_smoke.json",
     predictions_path=paths.PREDICTIONS_DIR / "fullres_smoke.zarr",
     historical_data_path=ds.hist, TARGET_VARIABLES=paths.TARGET_VARIABLES,
-    LOAD_PREDICTIONS=False, compute_indices=True))
+    LOAD_PREDICTIONS=False, compute_indices=False))
+log.info("reversed fields: %s", {v: tuple(y_phys[v].shape) for v in list(y_phys.data_vars)[:2]})
 
 log.info("FULLRES_SMOKE_OK")
