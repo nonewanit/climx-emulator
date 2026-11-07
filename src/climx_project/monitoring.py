@@ -7,6 +7,7 @@ Config shape (per experiment):
     logger:
       backend: wandb | tensorboard | none
       project: climx-lite        # W&B only
+      entity: null               # W&B only; team/account override (else wandb default)
       name: ffnn                  # optional; defaults to the experiment name
       offline: false              # W&B only; force offline mode
 
@@ -66,10 +67,11 @@ def _build_wandb(cfg_logger: Any, name):
         logger.info("W&B: no API key found — running in offline mode (wandb/ dir).")
 
     project = getattr(cfg_logger, "project", "climx-lite")
+    entity = getattr(cfg_logger, "entity", None) or None
     # Hydra chdirs into per-run dirs; keep W&B artifacts in one stable,
     # gitignored location (results/runs/wandb/) instead of scattering them.
     save_dir = str(paths.RUNS_DIR)
-    return WandbLogger(project=project, name=name, save_dir=save_dir)
+    return WandbLogger(project=project, name=name, entity=entity, save_dir=save_dir)
 
 
 def log_scalar(logger_obj, key: str, value: float, step: int = 0) -> None:

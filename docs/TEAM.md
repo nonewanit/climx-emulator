@@ -35,11 +35,18 @@ python train.py experiment=unet   # or climatology / lps / ffnn
 ```
 
 - Local CPU: only smoke runs (`experiment.trainer.max_epochs=1
-  experiment.trainer.max_days=120`). Real training = Kaggle GPU:
-  `kaggle kernels push -p kaggle-headless` (or the interactive notebook).
-- Sharing plots: `make sync-tb` (or copy `results/runs/tensorboard/` into
-  `monitoring/tensorboard/`), commit, push — teammates view with
-  `tensorboard --logdir monitoring/tensorboard`.
+  experiment.trainer.max_days=120`).
+- Real training = **Kaggle GPU, interactive notebook** (`notebooks/kaggle-unet.ipynb`,
+  imported from GitHub — see `docs/EXPERIMENTS.md` for the 3-minute flow).
+- **Headless `kaggle kernels push` runs are deprecated** (Nov 7): their
+  sessions cannot be stopped remotely, logs are blind until the run ends, and
+  outputs must be pulled. The `kaggle-headless/` and `kaggle-fullsmoke/`
+  folders are kept for reference only — do not use them.
+- Tracking = **W&B (cloud)**: set `WANDB_API_KEY` as a Kaggle notebook Secret
+  and run with `logger.backend=wandb logger.project=climx`. The run link is
+  shared in the team chat; everyone watches the same project page live.
+  (None's campus network blocks wandb.ai directly — he opens it in a browser
+  via VPN. Local CPU runs keep `logger.backend=tensorboard`.)
 
 ## Division of labor (agreed Nov 7)
 

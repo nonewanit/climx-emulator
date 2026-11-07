@@ -34,6 +34,7 @@ pip install -e .          # installs ONLY climx_project; run from repo root
 - **dask scheduler must stay single-threaded** — the threads scheduler deadlocked in `to_netcdf` (all threads in `futex_do_wait`), and `zarr` writes are at the same risk.
 - `to_netcdf(..., compute=False)` returns a Delayed that **must be `.compute()`d** — discarding it writes only the file header (~300 KB files, no data).
 - Kaggle CLI v2.2.5 credentials live at `~/.kaggle/access_token` (new-style; legacy `kaggle.json` also accepted — `climx_project.data` checks for either). Team must be registered **before the first submission** (merging teams later wipes history). Daily submission quota ~2.
+- **Collaboration workflow (Nov 7 pivot)**: real training runs in INTERACTIVE Kaggle notebooks (`notebooks/kaggle-unet.ipynb` imported from GitHub) with W&B cloud tracking (`logger.backend=wandb`, `WANDB_API_KEY` as a notebook Secret; wandb.ai blocked on this machine → view in browser via VPN). Headless `kaggle kernels push` is deprecated — its sessions can't be stopped remotely and logs are blind. `kaggle-headless/` + `kaggle-fullsmoke/` are legacy. No CLI/API stop-session exists; only the notebook page's "Stop Session" ends a session.
 
 ## Starter-kit bugs we route around
 
