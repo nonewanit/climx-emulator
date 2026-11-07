@@ -51,25 +51,47 @@ def _canonical_name(logical: str) -> str:
 
 
 def download_kaggle_bundle(competition: str = KAGGLE_COMPETITION) -> Path:
-    """Download the competition data bundle into data/. Returns the zip path."""
+    """Download the competition data bundle and extract it into data/raw/.
+
+    Returns the zip path. Idempotent: skips the download when the zip exists
+    and skips extraction when raw/ already holds .nc files.
+    """
     paths.DATA_DIR.mkdir(parents=True, exist_ok=True)
-    if BUNDLE_ZIP.exists() and BUNDLE_ZIP.stat().st_size > 0:
-        logger.info("Kaggle bundle already present: %s", BUNDLE_ZIP)
-        return BUNDLE_ZIP
-    creds = Path.home() / ".kaggle"
-    if not ((creds / "access_token").exists() or (creds / "kaggle.json").exists()):
-        raise RuntimeError(
-            "No Kaggle credentials found in ~/.kaggle/. Create an API token "
-            "(Account -> Settings -> Create New API Token) and save it to "
-            "~/.kaggle/access_token (CLI v2.x; legacy name kaggle.json), "
-            "chmod 600, and accept the competition rules at "
-            "https://www.kaggle.com/competitions/climx-main-track/rules. "
-            "Fallback: `python -m climx_project.data download-hf`."
-        )
-    cmd = ["kaggle", "competitions", "download", "-c", competition, "-p", str(paths.DATA_DIR)]
-    logger.info("Running: %s", " ".join(cmd))
-    subprocess.run(cmd, check=True)
+    if not (BUNDLE_ZIP.exists() and BUNDLE_ZIP.stat().st_size > 0):
+        creds = Path.home() / ".kaggle"
+        if not ((creds / "access_token").exists() or (creds / "kaggle.json").exists()):
+            raise RuntimeError(
+                "No Kaggle credentials found in ~/.kaggle/. Create an API token "
+                "(Account -> Settings -> Create New API Token) and save it to "
+                "~/.kaggle/access_token (CLI v2.x; legacy name kaggle.json), "
+                "chmod 600, and accept the competition rules at "
+                "https://www.kaggle.com/competitions/climx-main-track/rules. "
+                "Fallback: `python -m climx_project.data download-hf`."
+            )
+        cmd = ["kaggle", "competitions", "download", "-c", competition, "-p", str(paths.DATA_DIR)]
+        logger.info("Running: %s", " ".join(cmd))
+        subprocess.run(cmd, check=True)
+    _extract_bundle()
     return BUNDLE_ZIP
+
+
+def _extract_bundle() -> None:
+    """Unzip the downloaded bundle into data/raw/ (idempotent).
+
+    The zip's internal layout is NOT assumed — map_lite_files() rglobs
+    data/raw recursively, so any nesting works.
+    """
+    import zipfile
+
+    paths.RAW_DIR.mkdir(parents=True, exist_ok=True)
+    if list(paths.RAW_DIR.rglob("*.nc")):
+        logger.info("Bundle already extracted (raw/ has .nc files); skipping")
+        return
+    logger.info("Extracting %s -> %s ...", BUNDLE_ZIP.name, paths.RAW_DIR)
+    with zipfile.ZipFile(BUNDLE_ZIP) as zf:
+        zf.extractall(paths.RAW_DIR)
+    n = len(list(paths.RAW_DIR.rglob("*.nc")))
+    logger.info("Extracted %d .nc files into %s", n, paths.RAW_DIR)
 
 
 HF_MIRROR = "https://hf-mirror.com"  # huggingface.co is blocked on this network
@@ -111,9 +133,17 @@ def download_hf_lite() -> None:
 
 
 def _nc_candidates() -> list[Path]:
-    if not paths.RAW_DIR.exists():
+    """All .nc files under data/ except the preprocessing outputs.
+
+    Scans the whole data/ tree (not just raw/): covers teammates who
+    extracted the bundle somewhere else (e.g. straight into data/ or
+    data/lite/) and still lets map-lite pick the files up.
+    """
+    if not paths.DATA_DIR.exists():
         return []
-    return sorted(p for p in paths.RAW_DIR.rglob("*.nc"))
+    excluded = paths.PREPROCESSING_DIR.resolve()
+    return sorted(p for p in paths.DATA_DIR.rglob("*.nc")
+                  if not p.is_relative_to(excluded))
 
 
 def _grid_is_lite(path: Path) -> bool:
@@ -139,7 +169,11 @@ def map_lite_files(force: bool = False) -> dict[str, Path]:
     paths.LITE_DIR.mkdir(parents=True, exist_ok=True)
     candidates = _nc_candidates()
     if not candidates and not list(paths.LITE_DIR.glob("*.nc")):
-        raise FileNotFoundError(f"No .nc files found under {paths.RAW_DIR}")
+        raise FileNotFoundError(
+            f"No .nc files found under {paths.DATA_DIR} (excluding "
+            f"{paths.PREPROCESSING_DIR}). Run `python -m climx_project.data "
+            "download` to fetch and extract the Kaggle bundle, or put the "
+            "unzipped competition data anywhere under data/ and retry.")
 
     # Norm for matching: lowercase, '-' -> '_'
     def norm(name: str) -> str:
@@ -180,6 +214,10 @@ def map_lite_files(force: bool = False) -> dict[str, Path]:
         except FileExistsError:
             target.unlink()
             os.link(src, target)
+        except OSError as e:  # e.g. cross-device or FS without hardlinks
+            import shutil
+            logger.info("hardlink failed (%s) — copying instead", e)
+            shutil.copy2(src, target)
         report[logical] = src
         logger.info("Mapped %s -> %s", src.name, target.name)
 
@@ -304,7 +342,7 @@ def main(argv: list[str] | None = None) -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     parser = argparse.ArgumentParser(description="Lite dataset management")
     sub = parser.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("download", help="download the Kaggle competition data bundle")
+    sub.add_parser("download", help="download the Kaggle competition data bundle and extract it into data/raw/")
     sub.add_parser("download-hf", help="fallback: download lite/ from the HF mirror")
     sub.add_parser("map-lite", help="hardlink raw bundle files into data/lite/")
     sub.add_parser("check", help="verify the data/lite/ layout")
