@@ -75,7 +75,7 @@ def run_preprocess_test(dataset, *, load_into_memory: bool = False,
         dataset,
         preprocessing_path=paths.PREPROCESSING_DIR,
         version=version,
-        scaling_params_path=paths.SCALING_PARAMS_JSON,
+        scaling_params_path=paths.PREPROCESSING_DIR / f"scaling_parameters_{version}.json",
         load_into_memory=load_into_memory,
         stationarization_mode=stationarization_mode,
     )

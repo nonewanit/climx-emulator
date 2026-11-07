@@ -257,6 +257,43 @@ def open_full_datasets(*, hist_days: int | None = None, train_days: int | None =
     return type("FullDatasets", (), {"hist": hist, "train": train, "test_forcings": test})()
 
 
+def daily_forcings(ds: "xr.Dataset") -> "xr.Dataset":
+    """Upsample native-resolution forcings onto the daily time grid.
+
+    The FULL-resolution files store forcings only on their native
+    time_year/time_month grids, but the starter's preprocessing (climatology,
+    stationarization) expects a daily 'time' dim — the lite files had daily
+    forcings pre-merged, which is why this never surfaced on lite. Applies the
+    starter's own upsample_forcing_to_daily and drops the native aux dims.
+    """
+    import xarray as xr
+    from src.data_preprocessing.preprocessing import FORCING_VARIABLES, TARGET_VARIABLES
+    from src.data_preprocessing.preprocessing_utils import upsample_forcing_to_daily
+
+    yearly = [v for v in FORCING_VARIABLES
+              if v in ds and ("time_year" in ds[v].dims or "year" in ds[v].dims)]
+    monthly = [v for v in FORCING_VARIABLES
+               if v in ds and "time_month" in ds[v].dims]
+
+    parts = []
+    targets = [v for v in TARGET_VARIABLES if v in ds]
+    if targets:
+        parts.append(ds[targets])
+    if yearly:
+        parts.append(upsample_forcing_to_daily(ds, yearly, "time_year"))
+    if monthly:
+        parts.append(upsample_forcing_to_daily(ds, monthly, "time_month"))
+    if not parts:
+        return ds
+
+    out = xr.merge(parts, combine_attrs="drop_conflicts")
+    out = out.drop_vars(["time_month", "time_year"], errors="ignore")
+    for dim in ("time_month", "time_year"):
+        if dim in out.dims:
+            out = out.isel({dim: 0}, drop=True)
+    return out
+
+
 def main(argv: list[str] | None = None) -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     parser = argparse.ArgumentParser(description="Lite dataset management")

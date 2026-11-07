@@ -18,7 +18,7 @@ import time
 
 import climx_project  # noqa: F401  (vendor + env + compat patches)
 from climx_project import preprocess, paths
-from climx_project.data import open_full_datasets
+from climx_project.data import daily_forcings, open_full_datasets
 from climx_project.models.unet import UNetEmulator
 from climx_project.runners.base import set_seed
 
@@ -50,6 +50,12 @@ log.info("test dims: %s", dict(ds.test_forcings.sizes))
 
 # 2. Smoke climatology from the train slice (avoids reading the 63 GB hist files).
 ds.hist = ds.train  # same variable layout; values are wrong, plumbing is real
+
+# 2b. The FULL files store forcings at native monthly/yearly resolution; the
+# starter's preprocessing expects a daily time grid (lite had it pre-merged).
+stage("upsample forcings to daily", lambda: None)  # marker only
+ds.train = ds.hist = daily_forcings(ds.train)
+log.info("after daily_forcings, train dims: %s", dict(ds.train.sizes))
 
 # 3. Real preprocessing on the full grid.
 X_train, y_train, metadata = stage(
