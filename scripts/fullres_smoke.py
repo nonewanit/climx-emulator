@@ -86,6 +86,10 @@ else:
     # starter's preprocessing expects a daily time grid (lite had it pre-merged).
     stage("upsample forcings to daily", lambda: None)  # marker only
     ds.train = daily_forcings(ds.train)
+    # hist is an alias of train in open_full_datasets; after REBINDING ds.train
+    # the alias must be re-applied or ds.hist keeps the native-resolution
+    # dataset and the starter's climatology dies with KeyError 'time.month'.
+    ds.hist = ds.train
     log.info("after daily_forcings, train dims: %s", dict(ds.train.sizes))
 
     # 3. Real preprocessing on the full grid (the slow stage: ~2-3 h streaming).
