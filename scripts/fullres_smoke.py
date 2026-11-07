@@ -1,20 +1,28 @@
-"""Full-resolution U-Net SMOKE TEST — runs on Kaggle's GPU.
+"""Full-resolution U-Net SMOKE TEST — runs on Kaggle's GPU (interactive notebook).
 
 Proves the full-grid code path without downloading the 170 GB dataset:
 - opens the full-res NetCDFs REMOTELY (HF filesystem, range requests),
   sliced to a few hundred days,
 - runs the real preprocessing on the full 192x288 grid (climatology computed
   from the train slice — wrong values, valid plumbing),
-- trains the U-Net 1 epoch (pad_to [192,288], skip connections ON),
+- trains the U-Net 1 epoch (pad_to [192,288], skip connections ON, 1 device),
 - predicts on a small test slice and prints the shapes.
 
+IDEMPOTENT: if the preprocessed X/y .nc files exist from a previous run (they
+persist in /kaggle/working between notebook sessions), stages 1-3 are skipped
+and the arrays are loaded from disk — reruns cost minutes, not hours.
+
 Every stage prints OK/FAIL; the final line is "FULLRES_SMOKE_OK".
+Run it interactively with `%run scripts/fullres_smoke.py` for live output.
 """
 
+import json
 import logging
 import os
 import sys
 import time
+
+import xarray as xr
 
 import climx_project  # noqa: F401  (vendor + env + compat patches)
 from climx_project import preprocess, paths
@@ -30,8 +38,11 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("huggingface_hub").setLevel(logging.WARNING)
 
 os.environ.setdefault("CLIMX_PREPROCESS_DIR", "/kaggle/working/data/preprocessing_data_full_smoke")
+paths.ensure_dirs()  # results/{models,predictions,indices} for the later stages
 PREPROC_DIR = paths.PREPROCESSING_DIR
 PREPROC_DIR.mkdir(parents=True, exist_ok=True)
+SCALING_FULL = PREPROC_DIR / "scaling_parameters_full.json"
+CLIMATOLOGY_FULL = PREPROC_DIR / "climatology_full.nc"
 
 
 def stage(name, fn):
@@ -48,40 +59,58 @@ def stage(name, fn):
 
 # 1. Remote open (slices: 400 days x 2 train scenarios, 30 test days).
 # 400 days >= one full year: monthly_climatology_to_daily needs months 1..12.
+# Cheap (metadata only, ~10 s) — always run, even when preprocessing is cached.
 ds = stage("open full-res NetCDFs remotely", lambda: open_full_datasets(
     train_days=400, test_days=30))
 log.info("train dims: %s", dict(ds.train.sizes))
 log.info("test dims: %s", dict(ds.test_forcings.sizes))
 
-# 2. Smoke climatology from the train slice (avoids reading the 63 GB hist files).
-ds.hist = ds.train  # same variable layout; values are wrong, plumbing is real
+preprocessed = all(p.exists() for p in (paths.X_TRAIN_NC, paths.Y_TRAIN_NC,
+                                        paths.X_TEST_NC)) and SCALING_FULL.exists()
 
-# 2b. The FULL files store forcings at native monthly/yearly resolution; the
-# starter's preprocessing expects a daily time grid (lite had it pre-merged).
-stage("upsample forcings to daily", lambda: None)  # marker only
-ds.train = ds.hist = daily_forcings(ds.train)
-log.info("after daily_forcings, train dims: %s", dict(ds.train.sizes))
+if preprocessed:
+    log.info("preprocessed smoke data found on disk — skipping preprocessing")
+    X_train = xr.open_dataset(paths.X_TRAIN_NC, chunks={"time": 100, "lat": -1, "lon": -1})
+    y_train = xr.open_dataset(paths.Y_TRAIN_NC, chunks={"time": 100, "lat": -1, "lon": -1})
+    X_test = xr.open_dataset(paths.X_TEST_NC, chunks={"time": 100, "lat": -1, "lon": -1})
+    with open(SCALING_FULL) as f:
+        scaling_params = json.load(f)
+    metadata_test = {
+        "climatology_path": str(CLIMATOLOGY_FULL),
+        "scaling_params_path": str(SCALING_FULL),
+        "scaling_params": scaling_params,
+        "stationarization_mode": "monthly",
+    }
+else:
+    # 2. The FULL files store forcings at native monthly/yearly resolution; the
+    # starter's preprocessing expects a daily time grid (lite had it pre-merged).
+    stage("upsample forcings to daily", lambda: None)  # marker only
+    ds.train = daily_forcings(ds.train)
+    log.info("after daily_forcings, train dims: %s", dict(ds.train.sizes))
 
-# 3. Real preprocessing on the full grid.
-X_train, y_train, metadata = stage(
-    "preprocess_train (full grid, smoke slice)",
-    lambda: preprocess.run_preprocess_train(
-        ds, version="full", load_into_memory=False))
-X_test, metadata_test = stage(
-    "preprocess_test (full grid, smoke slice)",
-    lambda: preprocess.run_preprocess_test(ds, version="full", load_into_memory=False))
-log.info("X_train: %s | X_test: %s", dict(X_train.sizes), dict(X_test.sizes))
+    # 3. Real preprocessing on the full grid (the slow stage: ~2-3 h streaming).
+    X_train, y_train, _metadata = stage(
+        "preprocess_train (full grid, smoke slice)",
+        lambda: preprocess.run_preprocess_train(
+            ds, version="full", load_into_memory=False))
+    X_test, metadata_test = stage(
+        "preprocess_test (full grid, smoke slice)",
+        lambda: preprocess.run_preprocess_test(ds, version="full", load_into_memory=False))
+    log.info("X_train: %s | X_test: %s", dict(X_train.sizes), dict(X_test.sizes))
 
-# 4. U-Net fit, 1 epoch, full grid, skips ON.
+# 4. U-Net fit, 1 epoch, full grid, skips ON. devices=1 is REQUIRED: with
+# accelerator="auto" on a 2-GPU box Lightning launches DDP and hangs waiting
+# for the second client (v5 failure: DistStoreError timeout after 1801 s).
 set_seed(42)
 emulator = UNetEmulator(dict(
     n_in=22, n_out=7, base_channels=64, learning_rate=1e-3,
     variable_weights=[1.0, 1.5, 0.5, 0.5, 1.5, 1.5, 1.5],
     pad_to=[192, 288], skip_connections=True))
-stage("fit 1 epoch (192x288, skips ON)", lambda: emulator.fit(
+stage("fit 1 epoch (192x288, skips ON, 1 GPU)", lambda: emulator.fit(
     X_train, y_train, trainer_params=dict(
         max_epochs=1, batch_size=4, num_workers=2, max_days=60,
-        accelerator="auto", model_path=str(paths.MODELS_DIR / "fullres_smoke"),
+        accelerator="auto", devices=1,
+        model_path=str(paths.MODELS_DIR / "fullres_smoke"),
         logger=False)))
 
 # 5. Predict on the 30-day test slice.
