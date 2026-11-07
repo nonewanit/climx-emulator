@@ -38,6 +38,10 @@ materializing the whole dataset. Same reversal machinery at inference.
 2. **Grid handling**: the model already pads to a configurable `pad_to`;
    full grid uses `pad_to: [192, 288]` (no-op) — plus verify conv/pool parity
    (192×288 → 96×144 → 48×72 → 24×36: all even, clean).
+   **Skip connections: ON for the full grid** (`skip_connections: true`). The
+   lite A/B (2026-11-07) showed skips hurt on the coarse grid (−0.4348 vs
+   −0.4289), but fine spatial detail exists only at 192×288 — classic U-Net
+   evidence applies there. Report the ablation honestly.
 3. **Preprocessing for the full tier on Colab**: run the starter's
    `preprocess_train` lazily against the zarr (writes `climatology_full.nc` +
    scaling params — small), then stream-serve the anomalies. Climatology

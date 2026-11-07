@@ -16,10 +16,11 @@ model:
     # huss, pr, psl, sfcWind, tas, tasmax, tasmin — indices use tas*/pr
     variable_weights: [1.0, 1.5, 0.5, 0.5, 1.5, 1.5, 1.5]
     pad_to: [16, 32]
-    # Classic U-Net skip connections. true = the architecture going forward
-    # (pending the lite A/B); false reproduces the first lite submissions
-    # (LB -0.54374, local -0.4380).
-    skip_connections: true
+    # Classic U-Net skip connections. LITE A/B verdict (2026-11-07, 5 epochs,
+    # seed 42): skips OFF -0.4289 > skips ON -0.4348 — skips overfit the
+    # 216-pixel grid. Use false on lite; set true for the full-res grid
+    # (192x288) where fine spatial detail exists.
+    skip_connections: false
 trainer:
   max_epochs: 5
   batch_size: 64
