@@ -1,0 +1,10 @@
+{
+  "id": "nonewanitchollakit/climx-fullres-smoke",
+  "title": "climx-fullres-smoke",
+  "code_file": "run.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true
+}

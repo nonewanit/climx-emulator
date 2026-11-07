@@ -214,6 +214,49 @@ def open_datasets(chunks: object = "auto") -> object:
         paths.LITE_DIR.parent, paths.LITE_DIR.name, parallel=True, chunks=chunks)
 
 
+FULL_REPO = "datasets/isp-uv-es/ClimX/full"
+FULL_PREFIX = "NorESM2-MM_r1i1p1f1_with_forcing_"
+
+
+def open_full_datasets(*, hist_days: int | None = None, train_days: int | None = None,
+                       test_days: int | None = None, chunks: dict | None = None) -> object:
+    """Open the full-resolution (192x288) NetCDFs REMOTELY from Hugging Face.
+
+    Streams HDF5 chunks over range requests via the HF filesystem — nothing is
+    downloaded. The optional *_days slices bound the time axis for smoke runs
+    (each slice reads only the chunks it touches).
+
+    Returns a namespace with .hist / .train / .test_forcings (lazily loaded).
+    Note for smoke runs: `hist` may be replaced by a train slice by the caller
+    (see scripts/fullres_smoke.py) to avoid reading the ~63 GB historical files
+    just to exercise the code path.
+    """
+    import fsspec  # noqa: F401 (fsspec registers the hf:// protocol deps)
+    import xarray as xr
+    from huggingface_hub import HfFileSystem
+
+    fs = HfFileSystem()
+
+    def open_one(suffix: str, n_days: int | None):
+        url = f"{FULL_REPO}/{FULL_PREFIX}{suffix}.nc"
+        f = fs.open(url, "rb")
+        ds = xr.open_dataset(f, engine="h5netcdf", chunks=chunks or {})
+        if n_days:
+            ds = ds.isel(time=slice(0, n_days))
+        return ds
+
+    hist = xr.combine_by_coords(
+        [open_one("hist_train_1850_1931", hist_days),
+         open_one("hist_train_1932_2014", hist_days)],
+        combine_attrs="drop_conflicts")
+    train = xr.combine_by_coords(
+        [open_one("train_ssp126", train_days), open_one("train_ssp370", train_days)],
+        combine_attrs="drop_conflicts")
+    test = open_one("test_forcings_ssp245", test_days)
+
+    return type("FullDatasets", (), {"hist": hist, "train": train, "test_forcings": test})()
+
+
 def main(argv: list[str] | None = None) -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     parser = argparse.ArgumentParser(description="Lite dataset management")
