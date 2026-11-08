@@ -42,9 +42,16 @@ Streaming is the real cost, though: the smoke preprocessed ~15 GB of remote
 reads in ~2 h → **~2–3 MB/s effective** (single-threaded dask, per-task file
 opens, range-request latency). Naive remote streaming of 234 GB/epoch ≈
 **25–30 h/epoch** — infeasible. The fix: a ONE-TIME preprocessing job writes
-a compacted cache (float16, day-subsampled ×3 → ~39 GB) uploaded as a
+a compacted cache (float16, day-subsampled ×3 → ~51 GB with y) uploaded as a
 **private Kaggle dataset**; training then reads it as a local input mount
 (~1 GB/s, no streaming) — epochs become GPU-bound again (~1 h).
+
+Subsampling note: subsample DAYS (every 3rd day — each sample is a full
+daily field), never weekly AVERAGE. The LB indices are daily and
+extreme-aware (tx90p, consecutive-day runs, r99p) — weekly means erase the
+extremes the score measures. The same daily cache serves Phase C (world
+models predict next-DAY states); if Phase C needs contiguous sequences,
+rebuild the cache with a denser subsample — same script, same machinery.
 
 ## The core problem: 172 GB can't be preprocessed like lite
 
