@@ -3,7 +3,11 @@
 Streams the REAL full-res data once and writes compacted, reusable caches:
   data/preprocessing_data_full/climatology_full.nc        (monthly climatology)
   data/preprocessing_data_full/scaling_parameters_full.json
-  /tmp/full_cache/X_<var>.zarr, y_<var>.zarr             (fp16 + zstd chunks)
+  /tmp/full_cache/X_<var>_<scenario>.zarr, y_<var>_<scenario>.zarr
+                                                          (fp16 + zstd chunks)
+
+Scenario-pure files: Phase C (world model) needs contiguous daily sequences
+WITHIN a scenario, and training can attach only the scenario(s) it wants.
 
 Disk reality on Kaggle: /kaggle/working is 20 GB but the root overlay has
 ~1 TB free, so zarr files are written to /tmp (CLIMX_CACHE_DIR) and then
@@ -182,31 +186,48 @@ def main():
             stationarization_mode="monthly"))
     log.info("X vars: %s", sorted(list(X_scaled.data_vars)))
 
-    # 4. Write each variable to its own fp16+zstd zarr file, uploading
-    # completed variables in ~BATCH_GB batches (resumable via the manifest).
+    # 4. Write each (variable, scenario) to its own fp16+zstd zarr file,
+    # uploading in ~BATCH_GB batches per scenario (resumable via manifest).
+    # Scenario-pure files: Phase C needs contiguous daily sequences WITHIN a
+    # scenario, and training can attach only the scenario(s) it wants.
+    SCENARIOS = ["ssp126", "ssp370"]
     from numcodecs import Blosc
     ENCODING = {"dtype": "float16",
                 "compressor": Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE)}
 
     def write_vars(dsx, prefix):
-        names = [n for n in dsx.data_vars if f"{prefix}_{n}" not in uploaded]
-        total_gb = sum(float(dsx[n].size) * 2 / 1e9 for n in names)
-        log.info("vars to write (%s): %d — %.1f GB total", prefix, len(names), total_gb)
+        plan = []
+        for scen in SCENARIOS:
+            for name in dsx.data_vars:
+                key = f"{prefix}_{name}_{scen}"
+                if key in uploaded:
+                    continue
+                gb = float(dsx[name].size) * 2 / 1e9 / len(SCENARIOS)
+                plan.append((scen, name, key, gb))
+        total_gb = sum(g for *_, g in plan)
+        log.info("vars to write (%s): %d — %.1f GB total", prefix, len(plan), total_gb)
         pending: list[Path] = []
         pending_gb = 0.0
         done_gb = 0.0
         rate = None
-        for i, name in enumerate(names):
-            final = CACHE_DIR / f"{prefix}_{name}.zarr"
-            tmp = CACHE_DIR / f".tmp_{prefix}_{name}.zarr"
+        scen_ds = None
+        current_scen = None
+        for i, (scen, name, key, gb) in enumerate(plan):
+            if scen != current_scen:
+                if pending:  # flush on scenario switch: datasets stay scenario-pure
+                    upload_batch(pending, f"{current_scen}-{prefix.lower()}", manifest)
+                    pending, pending_gb = [], 0.0
+                current_scen = scen
+                scen_ds = dsx.sel(forcing_scenario=scen)
+            final = CACHE_DIR / f"{key}.zarr"
+            tmp = CACHE_DIR / f".tmp_{key}.zarr"
             if tmp.exists():
                 shutil.rmtree(tmp)
-            gb = float(dsx[name].size) * 2 / 1e9
-            log.info("=== write %s (%d/%d, %.1f GB) ===", name, i + 1, len(names), gb)
+            log.info("=== write %s (%d/%d, %.1f GB) ===", key, i + 1, len(plan), gb)
             t0 = time.time()
             with ProgressBar():
-                dsx[[name]].astype("float16").to_zarr(tmp, mode="w",
-                                                      encoding={name: ENCODING})
+                scen_ds[[name]].astype("float16").to_zarr(tmp, mode="w",
+                                                          encoding={name: ENCODING})
             tmp.rename(final)
             mins = (time.time() - t0) / 60
             rate = gb / mins
@@ -215,12 +236,12 @@ def main():
             pending_gb += gb
             eta_h = (total_gb - done_gb) / rate / 60 if rate else float("nan")
             log.info("OK %s: %.1f min, %.2f GB/min | done %.1f/%.1f GB | ETA %.1f h",
-                     name, mins, rate, done_gb, total_gb, eta_h)
+                     key, mins, rate, done_gb, total_gb, eta_h)
             if pending_gb >= BATCH_GB:
-                upload_batch(pending, prefix, manifest)
+                upload_batch(pending, f"{scen}-{prefix.lower()}", manifest)
                 pending, pending_gb = [], 0.0
         if pending:
-            upload_batch(pending, prefix, manifest)
+            upload_batch(pending, f"{current_scen}-{prefix.lower()}", manifest)
 
     write_vars(X_scaled, "X")
     write_vars(y_scaled, "y")
