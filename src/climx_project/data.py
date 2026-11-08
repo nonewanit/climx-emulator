@@ -332,14 +332,40 @@ def daily_forcings(ds: "xr.Dataset") -> "xr.Dataset":
     monthly = [v for v in FORCING_VARIABLES
                if v in ds and "time_month" in ds[v].dims]
 
+    def clean_forcing(varlist):
+        """Select forcing vars and strip redundant axes before upsampling.
+
+        The historical files store native-res forcings with a CONSTANT daily
+        'time' axis (verified: every time-slice identical — the value depends
+        only on the native time_year/time_month index) and sometimes a
+        degenerate forcing_scenario of size 1. The starter's
+        upsample_forcing_to_daily cannot handle the extra 'time' dim (its
+        final rename then collides with the real daily time), so drop it:
+        isel(time=0) is lossless by the constancy above.
+        """
+        out = {}
+        for v in varlist:
+            da = ds[v]
+            if "time" in da.dims:
+                da = da.isel(time=0, drop=True)
+            if "forcing_scenario" in da.dims and da.sizes["forcing_scenario"] == 1:
+                da = da.isel(forcing_scenario=0, drop=True)
+            out[v] = da
+        cleaned = xr.Dataset(out)
+        # upsample_forcing_to_daily interps onto ds.time.values — carry the
+        # daily time axis along as a coordinate.
+        if "time" in ds.coords:
+            cleaned = cleaned.assign_coords(time=ds.time)
+        return cleaned
+
     parts = []
     targets = [v for v in TARGET_VARIABLES if v in ds]
     if targets:
         parts.append(ds[targets])
     if yearly:
-        parts.append(upsample_forcing_to_daily(ds, yearly, "time_year"))
+        parts.append(upsample_forcing_to_daily(clean_forcing(yearly), yearly, "time_year"))
     if monthly:
-        parts.append(upsample_forcing_to_daily(ds, monthly, "time_month"))
+        parts.append(upsample_forcing_to_daily(clean_forcing(monthly), monthly, "time_month"))
     if not parts:
         return ds
 
