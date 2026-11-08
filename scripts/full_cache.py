@@ -32,6 +32,7 @@ import time
 from pathlib import Path
 
 import xarray as xr
+from dask.diagnostics import ProgressBar
 
 import climx_project  # noqa: F401  (vendor + env + compat patches)
 from climx_project import paths
@@ -105,11 +106,12 @@ def main():
             "train": ds.train.isel(time=slice(0, 2000)),
             "test_forcings": ds.test_forcings,
         })()
-        stage("pass A: climatology + scaling params (hist + 2000-day sample)",
-              lambda: preprocess_train(
-                  tiny, preprocessing_path=paths.PREPROCESSING_DIR,
-                  version="full", scaling_params_path=None,
-                  load_into_memory=False, stationarization_mode="monthly"))
+        with ProgressBar():
+            stage("pass A: climatology + scaling params (hist + 2000-day sample)",
+                  lambda: preprocess_train(
+                      tiny, preprocessing_path=paths.PREPROCESSING_DIR,
+                      version="full", scaling_params_path=None,
+                      load_into_memory=False, stationarization_mode="monthly"))
 
     # 3. Pass B: lazy scaled anomalies over the full train (no stats pass).
     X_scaled, y_scaled, _meta = stage(
@@ -126,22 +128,31 @@ def main():
                 "compressor": Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE)}
 
     def write_vars(dsx, prefix):
-        for name in list(dsx.data_vars):
+        names = [n for n in dsx.data_vars
+                 if not (CACHE_DIR / f"{prefix}_{n}.zarr").exists()]
+        total_gb = sum(float(dsx[n].size) * 2 / 1e9 for n in names)
+        log.info("vars to write (%s): %d — %.1f GB total",
+                 prefix, len(names), total_gb)
+        done_gb = 0.0
+        rate = None
+        for i, name in enumerate(names):
             final = CACHE_DIR / f"{prefix}_{name}.zarr"
-            if final.exists():
-                log.info("skip %s (exists)", final.name)
-                continue
             tmp = CACHE_DIR / f".tmp_{prefix}_{name}.zarr"
             if tmp.exists():
                 shutil.rmtree(tmp)
             gb = float(dsx[name].size) * 2 / 1e9
-            log.info("=== write %s (%.1f GB fp16) ===", final.name, gb)
+            log.info("=== write %s (%d/%d, %.1f GB) ===", name, i + 1, len(names), gb)
             t0 = time.time()
-            dsx[[name]].astype("float16").to_zarr(tmp, mode="w",
-                                                  encoding={name: ENCODING})
+            with ProgressBar():
+                dsx[[name]].astype("float16").to_zarr(tmp, mode="w",
+                                                      encoding={name: ENCODING})
             tmp.rename(final)
             mins = (time.time() - t0) / 60
-            log.info("OK %s: %.1f min, %.2f GB/min", final.name, mins, gb / mins)
+            rate = gb / mins
+            done_gb += gb
+            eta_h = (total_gb - done_gb) / rate / 60 if rate else float("nan")
+            log.info("OK %s: %.1f min, %.2f GB/min | done %.1f/%.1f GB | ETA %.1f h",
+                     name, mins, rate, done_gb, total_gb, eta_h)
 
     write_vars(X_scaled, "X")
     write_vars(y_scaled, "y")
