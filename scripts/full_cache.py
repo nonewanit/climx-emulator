@@ -3,30 +3,30 @@
 Streams the REAL full-res data once and writes compacted, reusable caches:
   data/preprocessing_data_full/climatology_full.nc        (monthly climatology)
   data/preprocessing_data_full/scaling_parameters_full.json
-  data/full_cache/X_<var>.zarr, y_<var>.zarr             (fp16 + zstd chunks)
+  /tmp/full_cache/X_<var>.zarr, y_<var>.zarr             (fp16 + zstd chunks)
 
-The cache is what Phase B (U-Net training) and Phase C (world model) both
-read. Two-pass design to minimize streaming:
+Disk reality on Kaggle: /kaggle/working is 20 GB but the root overlay has
+~1 TB free, so zarr files are written to /tmp (CLIMX_CACHE_DIR) and then
+AUTO-UPLOADED in ~20 GB batches as PRIVATE Kaggle datasets (the CLI only
+uploads whole folders, and each dataset gets its own size allowance).
+Completed batches are deleted from /tmp immediately.
 
-  pass A (once): climatology from the historical files + scaling params from
-                 a 2000-day train sample — small files, ~one session's
-                 streaming of the hist targets.
-  pass B:        the starter's preprocess_train with the cached scaling JSON
-                 (skips the stats pass) returns lazy scaled anomalies; each
-                 variable is then written to its own zarr file.
-
-RESUMABLE: every variable has its own file, written to a .tmp name and
-renamed on completion. A 9 h session kill loses at most the variable in
-flight — just re-run the script until it prints CACHE_OK. Throughput is
-logged per variable so we learn the real HF streaming rate.
+RESUMABLE across sessions via a manifest persisted in /kaggle/working
+(data/full_cache_meta/manifest.json): a 9 h session kill loses at most the
+batch in flight (and the manifest is saved after every upload). Re-run the
+script until it prints CACHE_OK — then commit the printed manifest into the
+repo (docs/full_cache_manifest.json) so the training notebook knows which
+datasets to attach.
 
 Run:  %run scripts/full_cache.py [--subsample 1|3]
 """
 
 import argparse
+import json
 import logging
 import os
 import shutil
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -45,9 +45,14 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("huggingface_hub").setLevel(logging.WARNING)
 
 os.environ.setdefault("CLIMX_PREPROCESS_DIR", "/kaggle/working/data/preprocessing_data_full")
-CACHE_DIR = Path(os.environ.get("CLIMX_CACHE_DIR", "/kaggle/working/data/full_cache"))
+CACHE_DIR = Path(os.environ.get("CLIMX_CACHE_DIR", "/tmp/full_cache"))
+META_DIR = Path(os.environ.get("CLIMX_CACHE_META_DIR", "/kaggle/working/data/full_cache_meta"))
+MANIFEST_PATH = META_DIR / "manifest.json"
 SCALING_JSON = paths.PREPROCESSING_DIR / "scaling_parameters_full.json"
 CLIMATOLOGY = paths.PREPROCESSING_DIR / "climatology_full.nc"
+
+BATCH_GB = float(os.environ.get("CLIMX_BATCH_GB", "20"))
+OWNER = os.environ.get("CLIMX_KAGGLE_OWNER", "nonewanitchollakit")
 
 # Native-res forcing dims must be chunked BEFORE the daily upsample expands
 # them: one full-var chunk would expand to 60k days x 192x288 in a single
@@ -68,6 +73,59 @@ def stage(name, fn):
     return out
 
 
+def load_manifest() -> dict:
+    if MANIFEST_PATH.exists():
+        with open(MANIFEST_PATH) as f:
+            return json.load(f)
+    return {"uploaded": [], "batch_idx": 0, "batches": {}}
+
+
+def save_manifest(m: dict) -> None:
+    META_DIR.mkdir(parents=True, exist_ok=True)
+    with open(MANIFEST_PATH, "w") as f:
+        json.dump(m, f, indent=2)
+
+
+def upload_batch(files: list[Path], prefix: str, manifest: dict) -> None:
+    """Upload `files` (+ the small preprocessing outputs on batch 1) as a new
+    private dataset, then delete them from /tmp."""
+    idx = int(manifest.get("batch_idx", 0)) + 1
+    slug = f"{OWNER}/climx-cache-{prefix.lower()}-{idx}"
+    stage_dir = Path("/tmp/ds_stage")
+    if stage_dir.exists():
+        shutil.rmtree(stage_dir)
+    stage_dir.mkdir(parents=True)
+    for p in files:
+        shutil.copytree(p, stage_dir / p.name)
+    # The climatology + scaling JSON must reach the TRAINING notebook (whose
+    # /kaggle/working is separate) — ship them in the first batch.
+    if idx == 1:
+        for p in (CLIMATOLOGY, SCALING_JSON):
+            if p.exists():
+                shutil.copy2(p, stage_dir / p.name)
+    metadata = {"title": f"climx-full-cache-{prefix.lower()}-{idx}",
+                "id": slug,
+                "licenses": [{"name": "CC-BY-4.0"}]}
+    with open(stage_dir / "dataset-metadata.json", "w") as f:
+        json.dump(metadata, f, indent=2)
+
+    gb = sum(p.stat().st_size for p in stage_dir.rglob("*") if p.is_file()) / 1e9
+    log.info("=== upload batch %d (%s): %.1f GB -> %s ===", idx, prefix, gb, slug)
+    t0 = time.time()
+    subprocess.run(["kaggle", "datasets", "create", "-p", str(stage_dir), "--private"],
+                   check=True)
+    mins = (time.time() - t0) / 60
+    log.info("OK upload %s: %.1f min, %.1f GB/min", slug, mins, gb / mins)
+
+    manifest["uploaded"] += [p.name for p in files]
+    manifest["batch_idx"] = idx
+    manifest.setdefault("batches", {})[slug] = [p.name for p in files]
+    save_manifest(manifest)
+    for p in files:
+        shutil.rmtree(p)
+    shutil.rmtree(stage_dir)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--subsample", type=int, default=1,
@@ -76,10 +134,12 @@ def main():
                          "Reads are chunk-granular, so this barely changes the "
                          "job duration — it changes cache SIZE.")
     args = ap.parse_args()
-    step = args.subsample
 
     paths.ensure_dirs()
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    manifest = load_manifest()
+    uploaded = set(manifest.get("uploaded", []))
+    log.info("manifest: %d uploaded so far", len(uploaded))
 
     # 1. Open everything lazily (metadata only, ~30 s).
     ds = stage("open full-res datasets (real hist + train)", lambda: open_full_datasets())
@@ -89,7 +149,7 @@ def main():
     ds.hist = ds.hist.chunk(_CHUNKS)
     ds.train = ds.train.chunk(_CHUNKS)
     if args.subsample != 1:
-        ds.train = ds.train.isel(time=slice(0, None, step))
+        ds.train = ds.train.isel(time=slice(0, None, args.subsample))
 
     # The climatology path needs DAILY time on the hist forcings (KeyError
     # 'time.month' otherwise); the train forcings are upsampled internally by
@@ -122,17 +182,18 @@ def main():
             stationarization_mode="monthly"))
     log.info("X vars: %s", sorted(list(X_scaled.data_vars)))
 
-    # 4. Write each variable to its own fp16+zstd zarr file (resumable).
+    # 4. Write each variable to its own fp16+zstd zarr file, uploading
+    # completed variables in ~BATCH_GB batches (resumable via the manifest).
     from numcodecs import Blosc
     ENCODING = {"dtype": "float16",
                 "compressor": Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE)}
 
     def write_vars(dsx, prefix):
-        names = [n for n in dsx.data_vars
-                 if not (CACHE_DIR / f"{prefix}_{n}.zarr").exists()]
+        names = [n for n in dsx.data_vars if f"{prefix}_{n}" not in uploaded]
         total_gb = sum(float(dsx[n].size) * 2 / 1e9 for n in names)
-        log.info("vars to write (%s): %d — %.1f GB total",
-                 prefix, len(names), total_gb)
+        log.info("vars to write (%s): %d — %.1f GB total", prefix, len(names), total_gb)
+        pending: list[Path] = []
+        pending_gb = 0.0
         done_gb = 0.0
         rate = None
         for i, name in enumerate(names):
@@ -150,13 +211,23 @@ def main():
             mins = (time.time() - t0) / 60
             rate = gb / mins
             done_gb += gb
+            pending.append(final)
+            pending_gb += gb
             eta_h = (total_gb - done_gb) / rate / 60 if rate else float("nan")
             log.info("OK %s: %.1f min, %.2f GB/min | done %.1f/%.1f GB | ETA %.1f h",
                      name, mins, rate, done_gb, total_gb, eta_h)
+            if pending_gb >= BATCH_GB:
+                upload_batch(pending, prefix, manifest)
+                pending, pending_gb = [], 0.0
+        if pending:
+            upload_batch(pending, prefix, manifest)
 
     write_vars(X_scaled, "X")
     write_vars(y_scaled, "y")
-    log.info("CACHE_OK")
+    batches = list(manifest.get("batches", {}).keys())
+    log.info("CACHE_OK — %d dataset(s): %s", len(batches), batches)
+    log.info("commit this manifest into docs/full_cache_manifest.json:\n%s",
+             json.dumps(manifest, indent=2))
 
 
 if __name__ == "__main__":
