@@ -75,17 +75,14 @@ the whole dataset. Same reversal machinery at inference.
 
 ## Work items (ordered)
 
-1. **One-time cache job** (`scripts/full_cache.py`): run `preprocess_train`
-   against the real `hist` (63 GB stream) + full train (2015–2100, 2
-   scenarios), cast to float16 + zstd, and write compacted X/y chunks
-   (~78 GB + ~25 GB). Upload as PRIVATE Kaggle datasets (`kaggle datasets
-   create`, split X and y across two) — one-time ~2 sessions. Climatology +
-   scaling JSON cached too. The ×1 cache serves Phase C unchanged;
-   Phase B subsamples at load time (every 3rd sample).
-2. **Chunked training Dataset**: replace `UNetEmulator.fit`'s `to_numpy` with
-   a map-style Dataset reading the local cache per time-chunk (mirrors the
-   starter's `NNDailyIterableDataset`). Local mount → I/O is a non-issue;
-   GPU-bound epochs.
+1. **One-time cache job** (`scripts/full_cache.py`) — DONE, running: streams
+   the real `hist` + full train (2015–2100, 2 scenarios), writes fp16+zstd
+   scenario-pure zarr chunks to /tmp, auto-uploads ~20 GB batches as private
+   per-scenario datasets, manifest-resumable across 9 h sessions.
+2. **Chunked training Dataset** — DONE (`_CacheDataset` + `_fit_cached` in
+   `unet.py`, integration-tested): block-buffered reads over the cache,
+   subsample-at-load (`sample_step=3`), shared trainer plumbing with the
+   in-memory lite path. Local mount → I/O is a non-issue; GPU-bound epochs.
 3. **Throughput**: batch 16–32 + AMP (`16-mixed`; T4 fp16 tensor cores ≈
    65 TFLOPS vs 8 fp32) — the smoke's 14 samples/s should become ~40–80,
    i.e. ~20–35 min/epoch at 16k samples.
