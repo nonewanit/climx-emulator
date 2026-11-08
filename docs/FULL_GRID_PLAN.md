@@ -42,16 +42,18 @@ Streaming is the real cost, though: the smoke preprocessed ~15 GB of remote
 reads in ~2 h → **~2–3 MB/s effective** (single-threaded dask, per-task file
 opens, range-request latency). Naive remote streaming of 234 GB/epoch ≈
 **25–30 h/epoch** — infeasible. The fix: a ONE-TIME preprocessing job writes
-a compacted cache (float16, day-subsampled ×3 → ~51 GB with y) uploaded as a
-**private Kaggle dataset**; training then reads it as a local input mount
+a compacted cache — **every day, float16 + zstd (~3× total: X ≈ 78 GB,
+y ≈ 25 GB)** — uploaded as **private Kaggle datasets** (split across two:
+X-cache and y-cache). Training attaches them as local input mounts
 (~1 GB/s, no streaming) — epochs become GPU-bound again (~1 h).
 
-Subsampling note: subsample DAYS (every 3rd day — each sample is a full
-daily field), never weekly AVERAGE. The LB indices are daily and
-extreme-aware (tx90p, consecutive-day runs, r99p) — weekly means erase the
-extremes the score measures. The same daily cache serves Phase C (world
-models predict next-DAY states); if Phase C needs contiguous sequences,
-rebuild the cache with a denser subsample — same script, same machinery.
+Subsampling happens at TRAINING TIME, not in the cache: Phase B's Dataset
+reads every 3rd sample (16k samples/epoch) — data volume 3× smaller, each
+sample still a full daily field. NEVER weekly-average: the LB indices are
+daily and extreme-aware (tx90p, consecutive-day runs, r99p) — weekly means
+erase the extremes the score measures. The ×1 cache also serves **Phase C
+directly**: the world model reads all days, contiguous, for next-DAY
+prediction — one cache, both phases, nothing rebuilt.
 
 ## The core problem: 172 GB can't be preprocessed like lite
 
@@ -75,9 +77,11 @@ the whole dataset. Same reversal machinery at inference.
 
 1. **One-time cache job** (`scripts/full_cache.py`): run `preprocess_train`
    against the real `hist` (63 GB stream) + full train (2015–2100, 2
-   scenarios), subsample days ×3, cast to float16, and write compacted X/y
-   chunks (~39 GB). Upload as a PRIVATE Kaggle dataset (`kaggle datasets
-   create`) — one-time ~2 sessions. Climatology + scaling JSON cached too.
+   scenarios), cast to float16 + zstd, and write compacted X/y chunks
+   (~78 GB + ~25 GB). Upload as PRIVATE Kaggle datasets (`kaggle datasets
+   create`, split X and y across two) — one-time ~2 sessions. Climatology +
+   scaling JSON cached too. The ×1 cache serves Phase C unchanged;
+   Phase B subsamples at load time (every 3rd sample).
 2. **Chunked training Dataset**: replace `UNetEmulator.fit`'s `to_numpy` with
    a map-style Dataset reading the local cache per time-chunk (mirrors the
    starter's `NNDailyIterableDataset`). Local mount → I/O is a non-issue;
