@@ -325,7 +325,6 @@ def daily_forcings(ds: "xr.Dataset") -> "xr.Dataset":
     """
     import xarray as xr
     from src.data_preprocessing.preprocessing import FORCING_VARIABLES, TARGET_VARIABLES
-    from src.data_preprocessing.preprocessing_utils import upsample_forcing_to_daily
 
     yearly = [v for v in FORCING_VARIABLES
               if v in ds and ("time_year" in ds[v].dims or "year" in ds[v].dims)]
@@ -352,20 +351,35 @@ def daily_forcings(ds: "xr.Dataset") -> "xr.Dataset":
                 da = da.isel(forcing_scenario=0, drop=True)
             out[v] = da
         cleaned = xr.Dataset(out)
-        # upsample_forcing_to_daily interps onto ds.time.values — carry the
-        # daily time axis along as a coordinate.
+        # The interp target is the daily time axis — carry it along as a
+        # coordinate (dropped again after the interp below).
         if "time" in ds.coords:
             cleaned = cleaned.assign_coords(time=ds.time)
         return cleaned
+
+    def upsample_clean(dsx, varlist, source_dim):
+        """Starter-equivalent upsample, version-proofed.
+
+        Newer xarray keeps the assigned daily 'time' coordinate through
+        interp(), so the starter's final `rename({source_dim: 'time'})`
+        collides ('the new name time conflicts'). Drop the coordinate
+        explicitly before renaming.
+        """
+        try:
+            resampled = dsx.interp({source_dim: dsx.time.values}, method="linear",
+                                   kwargs={"fill_value": "extrapolate"})
+        except TypeError:  # older xarray: no kwargs support
+            resampled = dsx.interp({source_dim: dsx.time.values}, method="linear")
+        return resampled.drop_vars("time", errors="ignore").rename({source_dim: "time"})
 
     parts = []
     targets = [v for v in TARGET_VARIABLES if v in ds]
     if targets:
         parts.append(ds[targets])
     if yearly:
-        parts.append(upsample_forcing_to_daily(clean_forcing(yearly), yearly, "time_year"))
+        parts.append(upsample_clean(clean_forcing(yearly), yearly, "time_year"))
     if monthly:
-        parts.append(upsample_forcing_to_daily(clean_forcing(monthly), monthly, "time_month"))
+        parts.append(upsample_clean(clean_forcing(monthly), monthly, "time_month"))
     if not parts:
         return ds
 
