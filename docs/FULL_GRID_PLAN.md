@@ -36,9 +36,15 @@ has exactly one hard problem: **234 GB of training arrays can't be
 materialized** — RAM and Kaggle's ~20 GB working disk both rule it out. The
 data must be **streamed chunk-by-chunk** with the preprocessing transforms
 (climatology/scaling/stationarization, cached as small files) applied lazily
-per chunk. At disk speed (~1 GB/s) that's ~4 min of I/O per epoch — training
-a real epoch fits comfortably inside a 9 h session, and even multi-epoch runs
-work with checkpointing.
+per chunk.
+
+Streaming is the real cost, though: the smoke preprocessed ~15 GB of remote
+reads in ~2 h → **~2–3 MB/s effective** (single-threaded dask, per-task file
+opens, range-request latency). Naive remote streaming of 234 GB/epoch ≈
+**25–30 h/epoch** — infeasible. The fix: a ONE-TIME preprocessing job writes
+a compacted cache (float16, day-subsampled ×3 → ~39 GB) uploaded as a
+**private Kaggle dataset**; training then reads it as a local input mount
+(~1 GB/s, no streaming) — epochs become GPU-bound again (~1 h).
 
 ## The core problem: 172 GB can't be preprocessed like lite
 
@@ -60,22 +66,37 @@ the whole dataset. Same reversal machinery at inference.
 
 ## Work items (ordered)
 
-1. **Streaming training data** (blocks everything): replace `UNetEmulator.fit`'s
-   `to_numpy` (materializes ~10 GB even for the smoke slice — 55 of the
-   55 min fit stage) with a dask-chunked map-style `Dataset` that reads
-   time-chunks per batch — mirroring the starter's `NNDailyIterableDataset`.
-   The GPU epoch is ~8 s per 30 batches, so even a simple chunked loader wins.
-   Keep `max_days` smoke mode on the same path.
-2. **Lazy preprocessing per chunk** (the 234 GB problem): cache
-   `climatology_full.nc` + scaling JSON (small, one-time ~8–12 h job), then
-   apply climatology/scaling/stationarization on the fly per time-chunk
-   during training. Never write full X/y to disk — it doesn't fit.
-3. **Throughput, only if needed**: the GPU does ~14 samples/s at batch 4
-   (3.53 it/s) — a real epoch ≈ 1 h already. Mixed precision (16-mixed) and
-   batch 16–32 are cheap wins on top; model slimming is optional.
+1. **One-time cache job** (`scripts/full_cache.py`): run `preprocess_train`
+   against the real `hist` (63 GB stream) + full train (2015–2100, 2
+   scenarios), subsample days ×3, cast to float16, and write compacted X/y
+   chunks (~39 GB). Upload as a PRIVATE Kaggle dataset (`kaggle datasets
+   create`) — one-time ~2 sessions. Climatology + scaling JSON cached too.
+2. **Chunked training Dataset**: replace `UNetEmulator.fit`'s `to_numpy` with
+   a map-style Dataset reading the local cache per time-chunk (mirrors the
+   starter's `NNDailyIterableDataset`). Local mount → I/O is a non-issue;
+   GPU-bound epochs.
+3. **Throughput**: batch 16–32 + AMP (`16-mixed`; T4 fp16 tensor cores ≈
+   65 TFLOPS vs 8 fp32) — the smoke's 14 samples/s should become ~40–80,
+   i.e. ~20–35 min/epoch at 16k samples.
 4. **Checkpoint/resume across 9 h sessions**: `pl.Trainer` checkpoint every
-   epoch, resume in the next session (skips re-preprocessing via idempotency
-   like the smoke script).
+   epoch, resume next session.
+5. **Real training notebook** (`notebooks/kaggle-full-unet.ipynb`): smoke
+   skeleton + cache attachment + checkpoint-resume.
+6. **Grid handling**: `pad_to: [192, 288]` (no-op) — parity verified in the
+   smoke. **Skips ON for the full grid** (lite A/B: skips hurt only on the
+   coarse grid). Model width is a Hydra knob (`base_channels`), see below.
+7. **Submission**: no upscale needed at 192×288 (verify `build_submission`).
+
+## Session budget (estimate, Kaggle 30 h GPU/week)
+
+| Step | Sessions |
+|---|---|
+| 1. Cache job (preprocess + upload, 39 GB) | ~2 (one-time) |
+| 2. Training: 5–10 epochs × ~0.5–1 h (batch 16–32, AMP), EarlyStopping patience 3 | ~1–2 |
+| 3. Predict 7 305 test days + indices + submission | ~0.5 |
+
+Total ≈ **4–5 sessions** (~35 h of the 30 h weekly quota → spans 2 weeks or
+use both accounts). Every step checkpoints, so nothing is lost to the 9 h cap.
 5. **Real training notebook** (`notebooks/kaggle-full-unet.ipynb`): reuse the
    smoke notebook skeleton; add checkpoint-resume so a 9 h session ends with
    a saved model, not lost work.
