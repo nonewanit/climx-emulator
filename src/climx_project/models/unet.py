@@ -135,6 +135,75 @@ class _ArrayDataset(Dataset):
                 torch.from_numpy(self.y[i]))
 
 
+class _CacheDataset(Dataset):
+    """Map-style dataset over the fp16 scenario-pure cache (scripts/full_cache.py).
+
+    Serves (scenario, day) samples without materializing anything: each zarr
+    time-block is loaded once into a small LRU buffer and its days are served
+    from memory. `step` subsamples days at LOAD time (daily physics kept —
+    never averaged), so the same ×1 cache feeds Phase B (step=3) and Phase C
+    (step=1, contiguous).
+    """
+
+    def __init__(self, cache_dir: Path, scenarios, day_indices, step: int = 1,
+                 block_days: int = 64, cache_blocks: int = 6):
+        self.block_days = block_days
+        self.cache: dict = {}
+        self.lru: list = []
+        self.cache_blocks = cache_blocks
+        self.x_paths = {}
+        self.y_paths = {}
+        self.time = {}
+        for scen in scenarios:
+            self.x_paths[scen] = sorted((cache_dir / f"X_{scen}").glob("*.zarr")) \
+                if (cache_dir / f"X_{scen}").is_dir() \
+                else sorted(cache_dir.glob(f"X_*_{scen}.zarr"))
+            self.y_paths[scen] = sorted(cache_dir.glob(f"Y_*_{scen}.zarr")) or \
+                sorted(cache_dir.glob(f"y_*_{scen}.zarr"))
+            if not self.x_paths[scen] or not self.y_paths[scen]:
+                raise FileNotFoundError(
+                    f"No cache files for scenario {scen} under {cache_dir}")
+            self.time[scen] = xr.open_zarr(self.x_paths[scen][0]).time.values
+        self.samples = [(scen, t) for scen in scenarios
+                        for t in day_indices[scen][::step]]
+
+    def __len__(self):
+        return len(self.samples)
+
+    def _load_block(self, scen, block):
+        t0 = block * self.block_days
+        t1 = min(t0 + self.block_days, len(self.time[scen]))
+        tsel = slice(t0, t1)
+
+        def read_var(p):
+            # each store holds one variable: the array named in the file stem
+            ds = xr.open_zarr(p).isel(time=tsel)
+            name = list(ds.data_vars)[0]
+            return ds[name].values.astype(np.float32)
+
+        xs = [read_var(p) for p in self.x_paths[scen]]
+        ys = [read_var(p) for p in self.y_paths[scen]]
+        # (C, T, H, W) -> (T, C, H, W)
+        x_block = np.stack(xs, axis=1)
+        y_block = np.stack(ys, axis=1)
+        key = (scen, block)
+        self.cache[key] = (x_block, y_block)
+        self.lru.append(key)
+        while len(self.lru) > self.cache_blocks:
+            self.cache.pop(self.lru.pop(0), None)
+
+    def __getitem__(self, i):
+        scen, t = self.samples[i]
+        block = t // self.block_days
+        key = (scen, block)
+        if key not in self.cache:
+            self._load_block(scen, block)
+        off = t - block * self.block_days
+        x_block, y_block = self.cache[key]
+        return (torch.from_numpy(x_block[off]),
+                torch.from_numpy(y_block[off]))
+
+
 class UNetEmulator(Emulator):
     def __init__(self, model_params):
         self.model_params = dict(model_params)
@@ -143,6 +212,10 @@ class UNetEmulator(Emulator):
         self.target_vars = None
 
     def fit(self, X_train, y_train, trainer_params=None, **kwargs):
+        # Cache-based dispatch: pass the cache DIR instead of datasets and the
+        # chunked _CacheDataset path is used (full-res training).
+        if isinstance(X_train, (str, Path)):
+            return self._fit_cached(Path(X_train), trainer_params)
         self.feature_vars = list(X_train.data_vars)
         self.target_vars = list(y_train.data_vars)
 
@@ -197,10 +270,16 @@ class UNetEmulator(Emulator):
                             shuffle=False,
                             num_workers=int(tp.get("num_workers", 0)))
 
+        self._train(train_dl, val_dl, tp)
+
+    def _train(self, train_dl, val_dl, tp):
+        """Shared trainer plumbing: callback setup, fit, best-checkpoint load."""
         trainer_kwargs = {k: v for k, v in tp.items()
                           if k not in ("batch_size", "num_workers",
                                        "model_path", "max_days",
-                                       "early_stop_patience")}
+                                       "early_stop_patience",
+                                       "scenarios", "sample_step",
+                                       "block_days", "cache_blocks")}
         trainer_kwargs.setdefault("logger", False)
         model_path = Path(tp.get("model_path", "results/models/unet"))
         model_path.mkdir(parents=True, exist_ok=True)
@@ -232,6 +311,52 @@ class UNetEmulator(Emulator):
         if best:
             self.model = UNetModule.load_from_checkpoint(best)
             logger.info("Loaded best-val checkpoint for evaluation: %s", best)
+
+    def _fit_cached(self, cache_dir: Path, trainer_params):
+        """Train from the fp16 scenario cache (scripts/full_cache.py output).
+
+        Trainer-param extras (all filtered from pl.Trainer):
+          scenarios:   ["ssp126", "ssp370"] — which cache scenarios to train on
+          sample_step: 3 — subsample days at LOAD time (daily physics kept)
+          max_days:    0 — smoke truncation of the per-scenario day list
+          block_days / cache_blocks: zarr block-buffer sizing
+        """
+        tp = dict(trainer_params or {})
+        scenarios = list(tp.get("scenarios", ["ssp126", "ssp370"]))
+        step = int(tp.get("sample_step", 3))
+        max_days = int(tp.get("max_days", 0) or 0)
+        block_days = int(tp.get("block_days", 64))
+        cache_blocks = int(tp.get("cache_blocks", 6))
+
+        # Cache file names: X_<var>_<scenario>.zarr / y_<var>_<scenario>.zarr.
+        self.feature_vars = [p.stem.split("_", 1)[1].rsplit("_", 1)[0]
+                             for p in sorted(cache_dir.glob(f"X_*_{scenarios[0]}.zarr"))]
+        self.target_vars = list(TARGET_VARIABLE_ORDER)
+        logger.info("cache vars: X=%s", self.feature_vars)
+
+        def day_index(scen, lo_year, hi_year):
+            p = sorted(cache_dir.glob(f"X_*_{scen}.zarr"))[0]
+            years = xr.open_zarr(p).time.dt.year.values
+            return [i for i, y in enumerate(years) if lo_year <= y <= hi_year]
+
+        tr_idx = {s: day_index(s, 2015, 2080) for s in scenarios}
+        val_idx = {s: day_index(s, 2081, 2100) for s in scenarios}
+        if max_days > 0:
+            tr_idx = {s: v[:max_days] for s, v in tr_idx.items()}
+            val_idx = {s: v[:max(1, max_days // 4)] for s, v in val_idx.items()}
+
+        train_ds = _CacheDataset(cache_dir, scenarios, tr_idx, step=step,
+                                 block_days=block_days, cache_blocks=cache_blocks)
+        val_ds = _CacheDataset(cache_dir, scenarios, val_idx, step=1,
+                               block_days=block_days, cache_blocks=cache_blocks)
+        logger.info("cache dataset: train %d (step %d), val %d",
+                    len(train_ds), step, len(val_ds))
+
+        train_dl = DataLoader(train_ds, batch_size=int(tp.get("batch_size", 64)),
+                              shuffle=True, num_workers=int(tp.get("num_workers", 0)))
+        val_dl = DataLoader(val_ds, batch_size=int(tp.get("batch_size", 64)),
+                            shuffle=False, num_workers=int(tp.get("num_workers", 0)))
+        self._train(train_dl, val_dl, tp)
 
     def predict(self, X, *, target_vars=None, time_chunk=512):
         self.model.eval()
