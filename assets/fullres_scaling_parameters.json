@@ -1,0 +1,108 @@
+{
+  "scaling_params": {
+    "huss": {
+      "method": "standardize",
+      "mean": -2.4332780838012695,
+      "std": 0.7131434082984924
+    },
+    "pr": {
+      "method": "standardize",
+      "mean": -5.148914337158203,
+      "std": 0.7074318528175354
+    },
+    "psl": {
+      "method": "standardize",
+      "mean": 100874.03125,
+      "std": 1462.9306640625
+    },
+    "sfcWind": {
+      "method": "standardize",
+      "mean": 6.274957656860352,
+      "std": 3.3302698135375977
+    },
+    "tas": {
+      "method": "standardize",
+      "mean": 278.4636688232422,
+      "std": 21.326
+    },
+    "tasmax": {
+      "method": "standardize",
+      "mean": 280.292236328125,
+      "std": 21.773544311523438
+    },
+    "tasmin": {
+      "method": "standardize",
+      "mean": 276.6351013183594,
+      "std": 22.21896743774414
+    },
+    "CO2_LBC": {
+      "method": "standardize",
+      "mean": 0.00040656598866917193,
+      "std": 4.643588454200653e-06
+    },
+    "N2O_LBC": {
+      "method": "standardize",
+      "mean": 3.2995370702337823e-07,
+      "std": 1.2195386922542184e-09
+    },
+    "CH4_LBC": {
+      "method": "standardize",
+      "mean": 1.8726956341197365e-06,
+      "std": 2.224483530710586e-08
+    },
+    "CFC11eq_LBC": {
+      "method": "standardize",
+      "mean": 8.393173378529184e-10,
+      "std": 1.3618355575173435e-11
+    },
+    "CF2CL2_LBC": {
+      "method": "standardize",
+      "mean": 5.07916930736485e-10,
+      "std": 7.397560862487662e-12
+    }
+  },
+  "target_variables": [
+    "huss",
+    "pr",
+    "psl",
+    "sfcWind",
+    "tas",
+    "tasmax",
+    "tasmin"
+  ],
+  "forcing_variables": [
+    "BC_AX",
+    "BC_N",
+    "SO2",
+    "SO4_PR",
+    "OM_NI",
+    "CO2_LBC",
+    "N2O_LBC",
+    "CH4_LBC",
+    "CFC11eq_LBC",
+    "CF2CL2_LBC"
+  ],
+  "_log_transform_info": {
+    "pr": {
+      "epsilon": 1e-06
+    },
+    "huss": {
+      "epsilon": 1e-06
+    },
+    "BC_AX": {
+      "epsilon": 1e-06
+    },
+    "BC_N": {
+      "epsilon": 1e-06
+    },
+    "SO2": {
+      "epsilon": 1e-06
+    },
+    "SO4_PR": {
+      "epsilon": 1e-06
+    },
+    "OM_NI": {
+      "epsilon": 1e-06
+    }
+  }
+}
