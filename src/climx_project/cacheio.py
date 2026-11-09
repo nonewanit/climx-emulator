@@ -12,7 +12,7 @@ def zarr_fp16_encoding() -> dict:
     if int(zarr.__version__.split(".")[0]) >= 3:
         from zarr.codecs import BloscCodec
         return {"dtype": "float16",
-                "compressors": [BloscCodec(cname="zstd", clevel=3, shuffle=1)]}
+                "compressors": [BloscCodec(cname="zstd", clevel=3, shuffle="shuffle")]}
     from numcodecs import Blosc
     return {"dtype": "float16",
             "compressor": Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE)}
