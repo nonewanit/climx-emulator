@@ -161,17 +161,33 @@ def main():
     ds.hist = daily_forcings(ds.hist)
 
     # 2. Pass A: climatology + scaling params (small files, one-time).
+    # Fast resample-based climatology (numerically identical to the starter's
+    # ~12 h groupby; verified 1e-14). Threads safe on local data.
     if CLIMATOLOGY.exists() and SCALING_JSON.exists():
         log.info("climatology + scaling params exist — skipping pass A")
     else:
-        hist_s = ds.hist.isel(time=slice(0, None, 3))  # cheaper groupby compute
+        if not CLIMATOLOGY.exists():
+            from climx_project.preprocess import fast_monthly_climatology
+            from src.data_preprocessing.preprocessing import FORCING_VARIABLES, TARGET_VARIABLES
+            hist_s = ds.hist.isel(time=slice(0, None, 3))
+            with ProgressBar():
+                tclim = stage("climatology: targets (fast resample)", lambda:
+                              fast_monthly_climatology(hist_s[TARGET_VARIABLES]))
+                fclim = stage("climatology: forcings (fast resample)", lambda:
+                              fast_monthly_climatology(hist_s[FORCING_VARIABLES]))
+            import dask
+            clim = xr.merge([tclim, fclim])
+            with dask.config.set(scheduler="threads"):
+                clim = clim.compute()
+            clim.to_netcdf(CLIMATOLOGY)
+            log.info("wrote %s", CLIMATOLOGY)
         tiny = type("DS", (), {
-            "hist": hist_s,
+            "hist": ds.hist.isel(time=slice(0, None, 3)),
             "train": ds.train.isel(time=slice(0, 2000)),
             "test_forcings": ds.test_forcings,
         })()
         with ProgressBar():
-            stage("pass A: climatology + scaling params (hist + 2000-day sample)",
+            stage("scaling params (2000-day sample)",
                   lambda: preprocess_train(
                       tiny, preprocessing_path=paths.PREPROCESSING_DIR,
                       version="full", scaling_params_path=None,

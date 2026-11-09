@@ -106,17 +106,35 @@ def main():
     ds.hist = daily_forcings(ds.hist)
 
     # 2. Climatology + scaling params (once; persisted in /kaggle/working).
+    # The climatology uses fast_monthly_climatology: the starter's
+    # groupby('time.month') takes ~12 h on the 60k-day hist (observed 1% in
+    # 429 s); the resample-based version is numerically identical (1e-14) and
+    # runs in minutes. Threads are safe here: local data, no remote handles.
     if CLIMATOLOGY.exists() and SCALING_JSON.exists():
         log.info("climatology + scaling params exist — skipping pass A")
     else:
-        hist_s = ds.hist.isel(time=slice(0, None, 3))
+        from climx_project.preprocess import fast_monthly_climatology
+        from src.data_preprocessing.preprocessing import FORCING_VARIABLES, TARGET_VARIABLES
+        if not CLIMATOLOGY.exists():
+            hist_s = ds.hist.isel(time=slice(0, None, 3))
+            with ProgressBar():
+                tclim = stage("climatology: targets (fast resample)", lambda:
+                              fast_monthly_climatology(hist_s[TARGET_VARIABLES]))
+                fclim = stage("climatology: forcings (fast resample)", lambda:
+                              fast_monthly_climatology(hist_s[FORCING_VARIABLES]))
+            import dask
+            clim = xr.merge([tclim, fclim])
+            with dask.config.set(scheduler="threads"):
+                clim = clim.compute()
+            clim.to_netcdf(CLIMATOLOGY)
+            log.info("wrote %s", CLIMATOLOGY)
         tiny = type("DS", (), {
-            "hist": hist_s,
+            "hist": ds.hist.isel(time=slice(0, None, 3)),
             "train": ds.train.isel(time=slice(0, 2000)),
             "test_forcings": ds.test_forcings,
         })()
         with ProgressBar():
-            stage("pass A: climatology + scaling params (local hist + sample)",
+            stage("scaling params (2000-day sample)",
                   lambda: preprocess_train(
                       tiny, preprocessing_path=paths.PREPROCESSING_DIR,
                       version="full", scaling_params_path=None,

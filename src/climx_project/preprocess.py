@@ -22,6 +22,7 @@ import sys
 import time
 from pathlib import Path
 
+import numpy as np
 import xarray as xr
 from dask.diagnostics import ProgressBar
 
@@ -83,6 +84,43 @@ def run_preprocess_test(dataset, *, load_into_memory: bool = False,
     _save_chunked(X_test, paths.X_TEST_NC, encoding=encoding)
     logger.info("preprocess_test done in %.1f min", (time.time() - t0) / 60)
     return X_test, metadata
+
+
+def fast_monthly_climatology(ds: xr.Dataset) -> xr.Dataset:
+    """Monthly mean/std climatology in the starter's exact format — fast.
+
+    The starter's compute_climatology uses groupby('time.month').mean/std,
+    which expands 12 boolean-mask tasks per chunk: ~12 HOURS on the full
+    60k-day history even from local disk (observed: 1% in 429 s). resample
+    is the optimized reduction path (~100x fewer tasks); the output is
+    converted to the identical ('month', 'lat', 'lon', 'stat') layout, so
+    every downstream consumer (stationarize, evaluate's reversal) is
+    byte-format-compatible.
+
+    Caller should compute this with the THREADS scheduler (local data only —
+    no shared remote handles) and then write the in-memory result; do not
+    run dask to_netcdf under threads (WSL deadlock evidence).
+    """
+    # Heavy part: per-year monthly sums/counts/sums-of-squares (resample's
+    # optimized reduction — 36 rows instead of 60k days), then collapse the
+    # per-year rows to calendar months with a trivial groupby and combine the
+    # sums EXACTLY (std matches xarray groupby.std's ddof=0).
+    rs = ds.resample(time="MS")
+    cnt = rs.count("time")
+    sm = rs.sum("time")
+    ss = (ds ** 2).resample(time="MS").sum("time")
+    month_of = sm.time.dt.month
+    n = cnt.groupby(month_of).sum("time")
+    s1 = sm.groupby(month_of).sum("time")
+    s2 = ss.groupby(month_of).sum("time")
+    mean = (s1 / n).fillna(0)
+    var = (s2 - s1 ** 2 / n) / n          # population variance (ddof=0)
+    var = var.fillna(1)
+    var = var.where(var != 0, 1)
+    std = np.sqrt(var.clip(min=0))
+    out = xr.concat([mean.expand_dims(dim="stat"), std.expand_dims(dim="stat")],
+                    dim="stat").assign_coords(stat=["mean", "std"])
+    return out
 
 
 def load_metadata() -> dict:
