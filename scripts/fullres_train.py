@@ -44,6 +44,10 @@ CACHE_DIR = Path(os.environ.get("CLIMX_CACHE_DIR", "/tmp/full_cache"))
 SCALING_JSON = paths.PREPROCESSING_DIR / "scaling_parameters_full.json"
 CLIMATOLOGY = paths.PREPROCESSING_DIR / "climatology_full.nc"
 MODE_MARKER = paths.PREPROCESSING_DIR / "stationarization_mode.txt"
+# Scaling params are FROZEN constants (mean/std per channel) — committing them
+# to the repo means no run ever recomputes them, even after /kaggle/working
+# wipes or fresh notebook imports.
+BUNDLED_SCALING = paths.PROJECT_ROOT / "assets" / "fullres_scaling_parameters.json"
 SCENARIOS = ["ssp126", "ssp370", "ssp585"]
 
 
@@ -135,6 +139,11 @@ def main():
     # uses fast_monthly_climatology (resample-based, numerically identical to
     # the starter's ~12 h groupby; verified 1e-14).
     mode = args.stationarization
+    if not SCALING_JSON.exists() and BUNDLED_SCALING.exists() and mode == "none":
+        log.info("using repo-bundled scaling params (%s)", BUNDLED_SCALING)
+        SCALING_JSON.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(BUNDLED_SCALING, SCALING_JSON)
+        MODE_MARKER.write_text("none")
     pass_a_needed = (not SCALING_JSON.exists() or _json_has_nan(SCALING_JSON)
                      or not MODE_MARKER.exists()
                      or MODE_MARKER.read_text().strip() != mode)
@@ -168,6 +177,10 @@ def main():
         if _json_has_nan(SCALING_JSON):
             raise RuntimeError("scaling params contain NaN — aborting")
         MODE_MARKER.write_text(mode)
+        BUNDLED_SCALING.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(SCALING_JSON, BUNDLED_SCALING)
+        log.info("scaling params copied to %s — COMMIT this file so no run ever recomputes them",
+                 BUNDLED_SCALING)
     else:
         log.info("scaling params exist for mode %s — skipping pass A", mode)
 
