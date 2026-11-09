@@ -43,7 +43,27 @@ os.environ.setdefault("CLIMX_PREPROCESS_DIR", "/kaggle/working/data/preprocessin
 CACHE_DIR = Path(os.environ.get("CLIMX_CACHE_DIR", "/tmp/full_cache"))
 SCALING_JSON = paths.PREPROCESSING_DIR / "scaling_parameters_full.json"
 CLIMATOLOGY = paths.PREPROCESSING_DIR / "climatology_full.nc"
+MODE_MARKER = paths.PREPROCESSING_DIR / "stationarization_mode.txt"
 SCENARIOS = ["ssp126", "ssp370", "ssp585"]
+
+
+def _json_has_nan(path: Path) -> bool:
+    """True if the scaling JSON contains NaN stats (a known failure mode of
+    the monthly-mode scaling stage — observed mean=nan for every variable)."""
+    import math
+    if not path.exists():
+        return False
+    d = json.load(open(path))
+
+    def walk(o) -> bool:
+        if isinstance(o, float) and math.isnan(o):
+            return True
+        if isinstance(o, dict):
+            return any(walk(v) for v in o.values())
+        if isinstance(o, list):
+            return any(walk(v) for v in o)
+        return False
+    return walk(d)
 
 # Native-res forcing dims must be chunked BEFORE the daily upsample expands
 # them (one full-var chunk would expand to ~60k days in a single dask task).
@@ -86,6 +106,10 @@ def main():
     ap.add_argument("--base-channels", type=int, default=64)
     ap.add_argument("--learning-rate", type=float, default=1e-3)
     ap.add_argument("--skip-connections", type=int, default=1, choices=(0, 1))
+    ap.add_argument("--stationarization", default="none", choices=("none", "monthly"),
+                    help="none = standardized RAW fields (fast, no climatology; "
+                         "the default). monthly = the organizer's anomaly pipeline "
+                         "(climatology + de-stationarization).")
     ap.add_argument("--max-days", type=int, default=0,
                     help=">0 = smoke: truncate training days per scenario")
     args = ap.parse_args()
@@ -105,17 +129,19 @@ def main():
     ds.train = ds.train.chunk(_CHUNKS)
     ds.hist = daily_forcings(ds.hist)
 
-    # 2. Climatology + scaling params (once; persisted in /kaggle/working).
-    # The climatology uses fast_monthly_climatology: the starter's
-    # groupby('time.month') takes ~12 h on the 60k-day hist (observed 1% in
-    # 429 s); the resample-based version is numerically identical (1e-14) and
-    # runs in minutes. Threads are safe here: local data, no remote handles.
-    if CLIMATOLOGY.exists() and SCALING_JSON.exists():
-        log.info("climatology + scaling params exist — skipping pass A")
-    else:
-        from climx_project.preprocess import fast_monthly_climatology
-        from src.data_preprocessing.preprocessing import FORCING_VARIABLES, TARGET_VARIABLES
-        if not CLIMATOLOGY.exists():
+    # 2. Scaling params (once; persisted in /kaggle/working). In "none" mode
+    # there is NO climatology: the params standardize the raw fields and the
+    # whole anomaly machinery is skipped. In "monthly" mode the climatology
+    # uses fast_monthly_climatology (resample-based, numerically identical to
+    # the starter's ~12 h groupby; verified 1e-14).
+    mode = args.stationarization
+    pass_a_needed = (not SCALING_JSON.exists() or _json_has_nan(SCALING_JSON)
+                     or not MODE_MARKER.exists()
+                     or MODE_MARKER.read_text().strip() != mode)
+    if pass_a_needed:
+        from src.data_preprocessing.preprocessing import FORCING_VARIABLES, TARGET_VARIABLES  # noqa: F401
+        if mode == "monthly" and not CLIMATOLOGY.exists():
+            from climx_project.preprocess import fast_monthly_climatology
             hist_s = ds.hist.isel(time=slice(0, None, 3))
             with ProgressBar():
                 tclim = stage("climatology: targets (fast resample)", lambda:
@@ -134,23 +160,30 @@ def main():
             "test_forcings": ds.test_forcings,
         })()
         with ProgressBar():
-            stage("scaling params (2000-day sample)",
+            stage(f"scaling params (2000-day sample, {mode})",
                   lambda: preprocess_train(
                       tiny, preprocessing_path=paths.PREPROCESSING_DIR,
                       version="full", scaling_params_path=None,
-                      load_into_memory=False, stationarization_mode="monthly"))
+                      load_into_memory=False, stationarization_mode=mode))
+        if _json_has_nan(SCALING_JSON):
+            raise RuntimeError("scaling params contain NaN — aborting")
+        MODE_MARKER.write_text(mode)
+    else:
+        log.info("scaling params exist for mode %s — skipping pass A", mode)
 
     # 3. Test preprocessing (once; X_test.nc persists, ~3.4 GB).
     if not paths.X_TEST_NC.exists():
         from climx_project.preprocess import run_preprocess_test
         X_test, metadata_test = stage(
             "preprocess_test (SSP2-4.5 forcings)", lambda: run_preprocess_test(
-                ds, version="full", load_into_memory=False))
+                ds, version="full", load_into_memory=False,
+                stationarization_mode=mode))
     else:
         from climx_project.preprocess import load_metadata
         X_test = xr.open_dataset(paths.X_TEST_NC, chunks={"time": 512, "lat": -1, "lon": -1})
         metadata_test = load_metadata()
-    log.info("X_test: %s", dict(X_test.sizes))
+    metadata_test["stationarization_mode"] = mode
+    log.info("X_test: %s (stationarization=%s)", dict(X_test.sizes), mode)
 
     # 4. Write the subsampled fp16 training cache to /tmp (per session).
     ds.train = ds.train.isel(time=slice(0, None, args.subsample))
@@ -159,7 +192,7 @@ def main():
         lambda: preprocess_train(
             ds, preprocessing_path=paths.PREPROCESSING_DIR, version="full",
             scaling_params_path=SCALING_JSON, load_into_memory=False,
-            stationarization_mode="monthly"))
+            stationarization_mode=mode))
 
     from numcodecs import Blosc
     ENCODING = {"dtype": "float16",

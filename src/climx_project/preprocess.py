@@ -80,6 +80,9 @@ def run_preprocess_test(dataset, *, load_into_memory: bool = False,
         load_into_memory=load_into_memory,
         stationarization_mode=stationarization_mode,
     )
+    # The evaluate() reversal keys off this metadata field — keep it honest
+    # when the caller overrides the mode (e.g. "none" for raw-field training).
+    metadata["stationarization_mode"] = stationarization_mode
     encoding = {var: {"zlib": False, "_FillValue": None} for var in X_test.data_vars}
     _save_chunked(X_test, paths.X_TEST_NC, encoding=encoding)
     logger.info("preprocess_test done in %.1f min", (time.time() - t0) / 60)
