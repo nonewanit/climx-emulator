@@ -37,11 +37,19 @@ def _save_chunked(ds: xr.Dataset, path: Path, *, encoding: dict | None = None) -
     ds = ds.chunk(_PREPROC_CHUNKS)
     for var in ds.data_vars:
         ds[var].encoding.clear()
+    # Stage the write in /tmp and move it into place: /kaggle/working is a
+    # FUSE-synced mount and large netCDF4 writes there die with
+    # "NetCDF: HDF error" near the end (observed at 99% of a 3.4 GB file).
+    # The final path then only ever holds COMPLETE files.
+    import shutil
+    import tempfile
+    tmp = Path(tempfile.gettempdir()) / (path.name + ".partial")
     logger.info("Writing %s ...", path.name)
     with ProgressBar():
         # compute=False returns a dask Delayed that must be explicitly
         # computed — discarding it writes only the file header, no data.
-        ds.to_netcdf(path, encoding=encoding, compute=False).compute()
+        ds.to_netcdf(tmp, encoding=encoding, compute=False).compute()
+    shutil.move(str(tmp), str(path))
     logger.info("Wrote %s", path.name)
 
 

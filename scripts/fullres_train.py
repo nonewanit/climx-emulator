@@ -189,6 +189,13 @@ def main():
     # 2081-2100 (7,305 days). Slice BEFORE preprocessing — the full file
     # would produce a ~152 GB X_test.nc that doesn't fit the 20 GB disk.
     ds.test_forcings = ds.test_forcings.sel(time=slice("2081-01-01", "2100-12-31"))
+    if paths.X_TEST_NC.exists():
+        try:
+            X_test = xr.open_dataset(paths.X_TEST_NC, chunks={"time": 512, "lat": -1, "lon": -1})
+            _ = dict(X_test.sizes)  # force open; corrupt files raise here
+        except Exception:
+            log.warning("X_test.nc is corrupt (partial write) — removing and redoing")
+            paths.X_TEST_NC.unlink()
     if not paths.X_TEST_NC.exists():
         # preprocess_test hard-requires the climatology file to EXIST even in
         # none-mode (it is never read there) — drop an empty placeholder.
