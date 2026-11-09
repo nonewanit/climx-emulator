@@ -140,7 +140,7 @@ def main():
                      or MODE_MARKER.read_text().strip() != mode)
     if pass_a_needed:
         from src.data_preprocessing.preprocessing import FORCING_VARIABLES, TARGET_VARIABLES  # noqa: F401
-        if mode == "monthly" and not CLIMATOLOGY.exists():
+        if mode == "monthly":  # always recompute here: a none-mode placeholder may exist
             from climx_project.preprocess import fast_monthly_climatology
             hist_s = ds.hist.isel(time=slice(0, None, 3))
             with ProgressBar():
@@ -172,7 +172,15 @@ def main():
         log.info("scaling params exist for mode %s — skipping pass A", mode)
 
     # 3. Test preprocessing (once; X_test.nc persists, ~3.4 GB).
+    # The test forcings file spans 2015-2100; the submission window is
+    # 2081-2100 (7,305 days). Slice BEFORE preprocessing — the full file
+    # would produce a ~152 GB X_test.nc that doesn't fit the 20 GB disk.
+    ds.test_forcings = ds.test_forcings.sel(time=slice("2081-01-01", "2100-12-31"))
     if not paths.X_TEST_NC.exists():
+        # preprocess_test hard-requires the climatology file to EXIST even in
+        # none-mode (it is never read there) — drop an empty placeholder.
+        if mode == "none" and not CLIMATOLOGY.exists():
+            xr.Dataset().to_netcdf(CLIMATOLOGY)
         from climx_project.preprocess import run_preprocess_test
         X_test, metadata_test = stage(
             "preprocess_test (SSP2-4.5 forcings)", lambda: run_preprocess_test(
