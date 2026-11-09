@@ -74,8 +74,42 @@ def _patch_stationarize_reverse() -> None:
     logger.info("Applied stationarize(reverse) daily-climatology patch")
 
 
+def _patch_compute_scaling_params() -> None:
+    """Make scaling-param computation a single-pass reduction per variable.
+
+    The starter's compute_scaling_params leaves the data in ~30-day chunks
+    (~200 tasks per variable over the 6000-day sample) and triggers a
+    separate compute per variable — observed ~42 min for the full set, and
+    the monthly-mode variant re-runs the whole anomaly graph per variable.
+    Rechunking each variable to ONE chunk collapses it to 1 task per
+    variable (identical values; skipna semantics preserved), ~1-2 min
+    total on local data.
+    """
+    import src.data_preprocessing.preprocessing as pp
+    import src.data_preprocessing.preprocessing_utils as ppu
+
+    def patched(ds, target_vars, forcing_vars, log_transform_info,
+                aerosol_threshold=0.1, std_epsilon=1e-9):
+        all_vars = target_vars + forcing_vars
+        ds_subset = ds[all_vars].chunk({"time": -1})
+        means = ds_subset.mean(skipna=True).compute()
+        stds = ds_subset.std(skipna=True).compute()
+        scaling_params = {}
+        for var in all_vars:
+            scaling_params[var] = {
+                "mean": float(means[var].values.item()),
+                "std": float(stds[var].values.item()),
+            }
+        return scaling_params
+
+    pp.compute_scaling_params = patched       # the name preprocess_train calls
+    ppu.compute_scaling_params = patched      # any direct importers
+    logger.info("Applied single-pass compute_scaling_params patch")
+
+
 def apply() -> None:
     _xr_dt._strftime_through_cftimeindex = _strftime_through_cftimeindex
     _xr_dt._strftime_through_series = _strftime_through_series
     _patch_stationarize_reverse()
+    _patch_compute_scaling_params()
     logger.info("Applied xarray strftime/ArrowStringArray compatibility patch")
