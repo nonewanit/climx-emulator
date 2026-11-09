@@ -259,14 +259,17 @@ def main():
             gb = float(dsx[name].size) * 2 / 1e9 / len(SCENARIOS)
             log.info("=== write %s (%d/%d, %.1f GB) ===", key, i + 1, len(plan), gb)
             t0 = time.time()
-            with ProgressBar():
-                # 256-day chunks: the starter rechunks to 30 days (349 tiny
-                # tasks per variable — each paying per-task latency on the
-                # input mount); 256 days cuts the task count ~8x.
-                dsx.sel(forcing_scenario=scen)[[name]].chunk(
-                    {"time": 256, "lat": -1, "lon": -1}
-                ).astype("float16").to_zarr(
-                    tmp, mode="w", encoding={name: ENCODING})
+            # ONE compute per variable: the chunked lazy path made hundreds of
+            # small scattered reads per variable, which the network-backed
+            # input mount serves at ~1 MB/s (dd shows 26 MB/s sequential, so
+            # it's a pattern penalty, not bandwidth). Compute the whole var
+            # into memory once (~1.2 GB fp16), then write to local zarr with
+            # bounded chunks for the training-side block reads.
+            da = dsx.sel(forcing_scenario=scen)[name]
+            arr = da.astype("float16").compute()
+            ds_out = xr.Dataset({name: (da.dims, arr)}, coords=da.coords)
+            ds_out.chunk({"time": 128, "lat": -1, "lon": -1}).to_zarr(
+                tmp, mode="w", encoding={name: ENCODING})
             tmp.rename(out)
             mins = (time.time() - t0) / 60
             rate = gb / mins
