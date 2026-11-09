@@ -20,6 +20,7 @@ import json
 import logging
 import os
 import shutil
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -122,6 +123,9 @@ def main():
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     full_dir = Path(os.environ.get("CLIMX_FULL_DIR", str(find_full_dir())))
     log.info("full-res data dir: %s", full_dir)
+    df = subprocess.run(["df", "-h", "/tmp", "/kaggle/working"],
+                        capture_output=True, text=True).stdout
+    log.info("disk:\n%s", df)
 
     # 1. Open everything locally (metadata only, seconds).
     ds = stage("open local full-res datasets", lambda: open_full_datasets_local(
@@ -184,33 +188,46 @@ def main():
     else:
         log.info("scaling params exist for mode %s — skipping pass A", mode)
 
-    # 3. Test preprocessing (once; X_test.nc persists, ~3.4 GB).
+    # 3. Test preprocessing. X_test.nc lives in /tmp (3.4 GB — /kaggle/working
+    # is a 20 GB FUSE mount that fills up and kills big writes; /tmp has
+    # ~1 TB). It re-runs each session (~10 min) — acceptable.
     # The test forcings file spans 2015-2100; the submission window is
     # 2081-2100 (7,305 days). Slice BEFORE preprocessing — the full file
-    # would produce a ~152 GB X_test.nc that doesn't fit the 20 GB disk.
+    # would produce a ~152 GB X_test.nc.
     ds.test_forcings = ds.test_forcings.sel(time=slice("2081-01-01", "2100-12-31"))
-    if paths.X_TEST_NC.exists():
+    X_TEST_NC = Path(os.environ.get("CLIMX_XTEST_DIR", "/tmp")) / "X_test.nc"
+
+    def _metadata_for():
+        return {
+            "climatology_path": str(CLIMATOLOGY),
+            "scaling_params_path": str(SCALING_JSON),
+            "scaling_params": json.load(open(SCALING_JSON)),
+            "stationarization_mode": mode,
+        }
+
+    if X_TEST_NC.exists():
         try:
-            X_test = xr.open_dataset(paths.X_TEST_NC, chunks={"time": 512, "lat": -1, "lon": -1})
+            X_test = xr.open_dataset(X_TEST_NC, chunks={"time": 512, "lat": -1, "lon": -1})
             _ = dict(X_test.sizes)  # force open; corrupt files raise here
+            metadata_test = _metadata_for()
         except Exception:
             log.warning("X_test.nc is corrupt (partial write) — removing and redoing")
-            paths.X_TEST_NC.unlink()
-    if not paths.X_TEST_NC.exists():
+            X_TEST_NC.unlink()
+    if not X_TEST_NC.exists():
         # preprocess_test hard-requires the climatology file to EXIST even in
         # none-mode (it is never read there) — drop an empty placeholder.
         if mode == "none" and not CLIMATOLOGY.exists():
             xr.Dataset().to_netcdf(CLIMATOLOGY)
-        from climx_project.preprocess import run_preprocess_test
+        from climx_project.preprocess import _save_chunked
+        from src.data_preprocessing.preprocessing import preprocess_test
         X_test, metadata_test = stage(
-            "preprocess_test (SSP2-4.5 forcings)", lambda: run_preprocess_test(
-                ds, version="full", load_into_memory=False,
+            "preprocess_test (SSP2-4.5 forcings)", lambda: preprocess_test(
+                ds, preprocessing_path=paths.PREPROCESSING_DIR, version="full",
+                scaling_params_path=SCALING_JSON, load_into_memory=False,
                 stationarization_mode=mode))
-    else:
-        from climx_project.preprocess import load_metadata
-        X_test = xr.open_dataset(paths.X_TEST_NC, chunks={"time": 512, "lat": -1, "lon": -1})
-        metadata_test = load_metadata()
-    metadata_test["stationarization_mode"] = mode
+        metadata_test["stationarization_mode"] = mode
+        encoding = {var: {"zlib": False, "_FillValue": None} for var in X_test.data_vars}
+        _save_chunked(X_test, X_TEST_NC, encoding=encoding)
     log.info("X_test: %s (stationarization=%s)", dict(X_test.sizes), mode)
 
     # 4. Write the subsampled fp16 training cache to /tmp (per session).
@@ -264,21 +281,23 @@ def main():
         learning_rate=args.learning_rate,
         variable_weights=[1.0, 1.5, 0.5, 0.5, 1.5, 1.5, 1.5],
         pad_to=[192, 288], skip_connections=bool(args.skip_connections)))
+    # Model + checkpoints + predictions + indices all live in /tmp (the
+    # predictions zarr alone is ~11 GB — impossible on the 20 GB mount).
     stage("fit (cache, 192x288)", lambda: emulator.fit(
         CACHE_DIR, None, trainer_params=dict(
             max_epochs=args.epochs, batch_size=args.batch, num_workers=2,
             sample_step=1, scenarios=SCENARIOS, max_days=args.max_days,
             accelerator="auto", devices=1,
-            model_path=str(paths.MODELS_DIR / "full_unet"),
+            model_path="/tmp/full_unet_models",
             logger=False)))
-    emulator.save(paths.MODELS_DIR / "full_unet.pt")
+    emulator.save("/tmp/full_unet.pt")
 
     # 6. Evaluate: predict + reversal + FULL index computation + submission.
     y_phys, indices_pred = stage(
         "evaluate (indices ON, SSP2-4.5 2081-2100)", lambda: emulator.evaluate(
             X_test, metadata_test,
-            results_path=paths.INDICES_DIR / "full_unet_evaluation.json",
-            predictions_path=paths.PREDICTIONS_DIR / "full_unet_predictions.zarr",
+            results_path=Path("/tmp/full_unet_evaluation.json"),
+            predictions_path=Path("/tmp/full_unet_predictions.zarr"),
             historical_data_path=ds.hist, TARGET_VARIABLES=paths.TARGET_VARIABLES,
             LOAD_PREDICTIONS=False, compute_indices=True))
     parquet = stage("build submission parquet", lambda: submission.build_submission(
