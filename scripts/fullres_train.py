@@ -260,7 +260,12 @@ def main():
             log.info("=== write %s (%d/%d, %.1f GB) ===", key, i + 1, len(plan), gb)
             t0 = time.time()
             with ProgressBar():
-                dsx.sel(forcing_scenario=scen)[[name]].astype("float16").to_zarr(
+                # 256-day chunks: the starter rechunks to 30 days (349 tiny
+                # tasks per variable — each paying per-task latency on the
+                # input mount); 256 days cuts the task count ~8x.
+                dsx.sel(forcing_scenario=scen)[[name]].chunk(
+                    {"time": 256, "lat": -1, "lon": -1}
+                ).astype("float16").to_zarr(
                     tmp, mode="w", encoding={name: ENCODING})
             tmp.rename(out)
             mins = (time.time() - t0) / 60
