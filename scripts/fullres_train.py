@@ -194,7 +194,7 @@ def main():
     # The test forcings file spans 2015-2100; the submission window is
     # 2081-2100 (7,305 days). Slice BEFORE preprocessing — the full file
     # would produce a ~152 GB X_test.nc.
-    ds.test_forcings = ds.test_forcings.sel(time=slice("2081-01-01", "2100-12-31"))
+    ds.test_forcings = ds.test_forcings.sel(time=slice("2081-01-01", "2101-01-01"))
     X_TEST_NC = Path(os.environ.get("CLIMX_XTEST_DIR", "/tmp")) / "X_test.nc"
 
     def _metadata_for():
@@ -239,9 +239,8 @@ def main():
             scaling_params_path=SCALING_JSON, load_into_memory=False,
             stationarization_mode=mode))
 
-    from numcodecs import Blosc
-    ENCODING = {"dtype": "float16",
-                "compressor": Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE)}
+    from climx_project.cacheio import zarr_fp16_encoding
+    ENCODING = zarr_fp16_encoding()
 
     def write_cache(dsx, prefix):
         plan = [(s, n) for s in SCENARIOS for n in dsx.data_vars]

@@ -207,9 +207,8 @@ def main():
     # Scenario-pure files: Phase C needs contiguous daily sequences WITHIN a
     # scenario, and training can attach only the scenario(s) it wants.
     SCENARIOS = ["ssp126", "ssp370"]
-    from numcodecs import Blosc
-    ENCODING = {"dtype": "float16",
-                "compressor": Blosc(cname="zstd", clevel=3, shuffle=Blosc.SHUFFLE)}
+    from climx_project.cacheio import zarr_fp16_encoding
+    ENCODING = zarr_fp16_encoding()
 
     def write_vars(dsx, prefix):
         plan = []
