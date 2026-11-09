@@ -314,6 +314,44 @@ def open_full_datasets(*, hist_days: int | None = None, train_days: int | None =
     return type("FullDatasets", (), {"hist": hist, "train": train, "test_forcings": test})()
 
 
+def open_full_datasets_local(root: "str | Path", *, hist_days: int | None = None,
+                             train_days: int | None = None, test_days: int | None = None,
+                             chunks: dict | None = None,
+                             scenarios: tuple[str, ...] = ("ssp126", "ssp370", "ssp585")) -> object:
+    """Open the full-resolution NetCDFs from a LOCAL directory.
+
+    Use with the Kaggle dataset input `dtdoww/climx-full-resolution-data`
+    (mount: /kaggle/input/datasets/dtdoww/climx-full-resolution-data) — the
+    complete full tier (hist 1850-2014, train 2015-2100 x 3 scenarios,
+    SSP2-4.5 test forcings) on local disk. No HF streaming: reads are
+    ~1 GB/s, so preprocessing and training I/O stop being the bottleneck.
+
+    Same structure and conventions as open_full_datasets (scenarios along a
+    new forcing_scenario dim, hist along time).
+    """
+    import xarray as xr
+
+    root = Path(root)
+
+    def open_one(suffix: str, n_days: int | None):
+        path = root / f"{FULL_PREFIX}{suffix}.nc"
+        ds = xr.open_dataset(path, engine="h5netcdf", chunks=chunks or {"time": 365})
+        if n_days:
+            ds = ds.isel(time=slice(0, n_days))
+        return ds
+
+    hist = xr.concat(
+        [open_one("hist_train_1850_1931", hist_days),
+         open_one("hist_train_1932_2014", hist_days)],
+        dim="time", combine_attrs="drop_conflicts")
+    train = xr.concat(
+        [open_one(f"train_{s}", train_days) for s in scenarios],
+        dim="forcing_scenario", combine_attrs="drop_conflicts")
+    test = open_one("test_forcings_ssp245", test_days)
+
+    return type("FullDatasets", (), {"hist": hist, "train": train, "test_forcings": test})()
+
+
 def daily_forcings(ds: "xr.Dataset") -> "xr.Dataset":
     """Upsample native-resolution forcings onto the daily time grid.
 

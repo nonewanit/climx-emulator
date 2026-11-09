@@ -4,6 +4,13 @@ Status: **SMOKE PASSED (Nov 8)** — `FULLRES_SMOKE_OK`. The full-res code path
 is proven end to end; the real run is now an engineering scaling problem, not
 a feasibility question.
 
+**UPDATE (Nov 9): the full tier is available as a LOCAL Kaggle dataset**
+(`dtdoww/climx-full-resolution-data`, 171 GB — all 7 files incl. train_ssp585).
+Training now reads the local mount (~1 GB/s) instead of HF streaming; the
+private-cache-dataset plan is unnecessary for Phase B (`scripts/fullres_train.py`
+writes a subsampled fp16 cache to /tmp per session, ~15 min). The
+`scripts/full_cache.py` job stays for Phase C (contiguous ×1 cache).
+
 ## Smoke verdict (2026-11-08, Kaggle T4 x2, interactive notebook)
 
 All stages green on the 192×288 grid: remote HF streaming (time-chunked,
