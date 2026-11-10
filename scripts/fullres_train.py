@@ -72,7 +72,11 @@ def _json_has_nan(path: Path) -> bool:
 
 # Native-res forcing dims must be chunked BEFORE the daily upsample expands
 # them (one full-var chunk would expand to ~60k days in a single dask task).
-_CHUNKS = {"time": 365, "time_month": 24, "time_year": -1, "lat": -1, "lon": -1}
+# time=-1 makes every daily variable ONE physical read: the mount does
+# 26 MB/s sequentially but ~2 MB/s on scattered chunk reads (the y targets
+# crawled at 20 min/var through 86 separate reads; one read = ~4-5 min/var).
+# Peak memory: one 6.9 GB fp32 var at a time — fine on Kaggle GPU instances.
+_CHUNKS = {"time": -1, "time_month": 24, "time_year": -1, "lat": -1, "lon": -1}
 
 
 def stage(name, fn):
