@@ -266,6 +266,12 @@ def main():
             # into memory once (~1.2 GB fp16), then write to local zarr with
             # bounded chunks for the training-side block reads.
             da = dsx.sel(forcing_scenario=scen)[name]
+            # ONE sequential read pass: rechunking to a single time chunk makes
+            # dask read the whole variable contiguously. The mount does 26 MB/s
+            # sequentially (dd) but ~2 MB/s on scattered chunk reads — the y
+            # (daily target) vars were crawling at 22 min each through 29
+            # separate 80 MB chunk reads.
+            da = da.chunk({"time": -1})
             arr = da.astype("float16").compute().values  # DataArray.compute() -> DataArray; need numpy
             ds_out = xr.Dataset({name: (da.dims, arr)}, coords=da.coords)
             # 1D vars (yearly GHGs) have no lat/lon — chunk only the dims
