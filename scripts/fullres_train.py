@@ -268,7 +268,10 @@ def main():
             da = dsx.sel(forcing_scenario=scen)[name]
             arr = da.astype("float16").compute().values  # DataArray.compute() -> DataArray; need numpy
             ds_out = xr.Dataset({name: (da.dims, arr)}, coords=da.coords)
-            ds_out.chunk({"time": 128, "lat": -1, "lon": -1}).to_zarr(
+            # 1D vars (yearly GHGs) have no lat/lon — chunk only the dims
+            # that exist; 128-day chunks keep the training block reads cheap.
+            chunks = {d: (128 if d == "time" else -1) for d in da.dims}
+            ds_out.chunk(chunks).to_zarr(
                 tmp, mode="w", encoding={name: ENCODING})
             tmp.rename(out)
             mins = (time.time() - t0) / 60
