@@ -266,6 +266,11 @@ def main():
             # into memory once (~1.2 GB fp16), then write to local zarr with
             # bounded chunks for the training-side block reads.
             da = dsx.sel(forcing_scenario=scen)[name]
+            # 1D global vars (yearly GHGs) must become full fields: the U-Net
+            # treats every channel as (time, lat, lon) — the starter's own
+            # pipeline broadcasts them; broadcast here so the cache is uniform.
+            if "lat" not in da.dims:
+                da = da.expand_dims(lat=dsx.lat, lon=dsx.lon).transpose("time", "lat", "lon")
             # ONE sequential read pass: rechunking to a single time chunk makes
             # dask read the whole variable contiguously. The mount does 26 MB/s
             # sequentially (dd) but ~2 MB/s on scattered chunk reads — the y
