@@ -266,7 +266,7 @@ def main():
             # into memory once (~1.2 GB fp16), then write to local zarr with
             # bounded chunks for the training-side block reads.
             da = dsx.sel(forcing_scenario=scen)[name]
-            arr = da.astype("float16").compute()
+            arr = da.astype("float16").compute().values  # DataArray.compute() -> DataArray; need numpy
             ds_out = xr.Dataset({name: (da.dims, arr)}, coords=da.coords)
             ds_out.chunk({"time": 128, "lat": -1, "lon": -1}).to_zarr(
                 tmp, mode="w", encoding={name: ENCODING})
