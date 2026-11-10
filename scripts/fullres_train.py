@@ -40,7 +40,10 @@ log = logging.getLogger("fullres_train")
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("huggingface_hub").setLevel(logging.WARNING)
 
-os.environ.setdefault("CLIMX_PREPROCESS_DIR", "/kaggle/working/data/preprocessing_data_full")
+# NOTE: paths.PREPROCESSING_DIR was resolved at `import climx_project` time
+# (env overrides set after the import are ignored) — the small artifacts
+# (scaling JSON, mode marker) land in the repo's data/preprocessing_data_lite/
+# inside /kaggle/working, which persists across sessions of the notebook.
 CACHE_DIR = Path(os.environ.get("CLIMX_CACHE_DIR", "/tmp/full_cache"))
 SCALING_JSON = paths.PREPROCESSING_DIR / "scaling_parameters_full.json"
 CLIMATOLOGY = paths.PREPROCESSING_DIR / "climatology_full.nc"
@@ -77,6 +80,10 @@ def _json_has_nan(path: Path) -> bool:
 # crawled at 20 min/var through 86 separate reads; one read = ~4-5 min/var).
 # Peak memory: one 6.9 GB fp32 var at a time — fine on Kaggle GPU instances.
 _CHUNKS = {"time": -1, "time_month": 24, "time_year": -1, "lat": -1, "lon": -1}
+# The hist is read ONLY by the indices' base period (1961-1990, 4 vars): a
+# -1 chunk would force whole-13.3 GB reads per var; 10-year chunks let the
+# 30-year window read just its ~3 chunks per var (~13 GB total instead of 53).
+_HIST_CHUNKS = {"time": 3650, "time_month": 24, "time_year": -1, "lat": -1, "lon": -1}
 
 
 def stage(name, fn):
@@ -137,7 +144,7 @@ def main():
     log.info("hist: %s | train: %s | test: %s",
              dict(ds.hist.sizes), dict(ds.train.sizes), dict(ds.test_forcings.sizes))
 
-    ds.hist = ds.hist.chunk(_CHUNKS)
+    ds.hist = ds.hist.chunk(_HIST_CHUNKS)
     ds.train = ds.train.chunk(_CHUNKS)
     ds.hist = daily_forcings(ds.hist)
 
@@ -196,8 +203,8 @@ def main():
     # is a 20 GB FUSE mount that fills up and kills big writes; /tmp has
     # ~1 TB). It re-runs each session (~10 min) — acceptable.
     # The test forcings file spans 2015-2100; the submission window is
-    # 2081-2100 (7,305 days). Slice BEFORE preprocessing — the full file
-    # would produce a ~152 GB X_test.nc.
+    # 2081-2100 (7,300 NoLeap days). Slice BEFORE preprocessing — the full
+    # file would produce a ~152 GB X_test.nc.
     ds.test_forcings = ds.test_forcings.sel(time=slice("2081-01-01", "2101-01-01"))
     X_TEST_NC = Path(os.environ.get("CLIMX_XTEST_DIR", "/tmp")) / "X_test.nc"
 
@@ -318,13 +325,20 @@ def main():
     emulator.save("/tmp/full_unet.pt")
 
     # 6. Evaluate: predict + reversal + FULL index computation + submission.
-    y_phys, indices_pred = stage(
-        "evaluate (indices ON, SSP2-4.5 2081-2100)", lambda: emulator.evaluate(
-            X_test, metadata_test,
-            results_path=Path("/tmp/full_unet_evaluation.json"),
-            predictions_path=Path("/tmp/full_unet_predictions.zarr"),
-            historical_data_path=ds.hist, TARGET_VARIABLES=paths.TARGET_VARIABLES,
-            LOAD_PREDICTIONS=False, compute_indices=True))
+    # Threads scheduler for this stage: everything it touches is local/in-
+    # memory (X_test.nc, in-memory predictions, lazy hist) — no shared remote
+    # handles — and the 15 xclim indices parallelize ~4x. The zarr prediction
+    # write goes through zarr v3's own async machinery, not the WSL-era
+    # dask.array.store path that deadlocked on this machine.
+    import dask
+    with dask.config.set(scheduler="threads"):
+        y_phys, indices_pred = stage(
+            "evaluate (indices ON, SSP2-4.5 2081-2100)", lambda: emulator.evaluate(
+                X_test, metadata_test,
+                results_path=Path("/tmp/full_unet_evaluation.json"),
+                predictions_path=Path("/tmp/full_unet_predictions.zarr"),
+                historical_data_path=ds.hist, TARGET_VARIABLES=paths.TARGET_VARIABLES,
+                LOAD_PREDICTIONS=False, compute_indices=True))
     parquet = stage("build submission parquet", lambda: submission.build_submission(
         indices_pred, "unet_full"))
     report = submission.verify_parquet(parquet)
