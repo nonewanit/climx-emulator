@@ -75,11 +75,12 @@ def _json_has_nan(path: Path) -> bool:
 
 # Native-res forcing dims must be chunked BEFORE the daily upsample expands
 # them (one full-var chunk would expand to ~60k days in a single dask task).
-# time=-1 makes every daily variable ONE physical read: the mount does
-# 26 MB/s sequentially but ~2 MB/s on scattered chunk reads (the y targets
-# crawled at 20 min/var through 86 separate reads; one read = ~4-5 min/var).
-# Peak memory: one 6.9 GB fp32 var at a time — fine on Kaggle GPU instances.
-_CHUNKS = {"time": -1, "time_month": 24, "time_year": -1, "lat": -1, "lon": -1}
+# time=365 for the TRAIN: the X cache reads only small monthly sources, and
+# 365-day output chunks keep the upsample/split task memory bounded. The y
+# (daily target) cache no longer goes through dask at all — see
+# write_y_cache_direct (the mount crawls on h5netcdf's chunk walk regardless
+# of dask chunking; one direct netCDF4 read per variable is the fast path).
+_CHUNKS = {"time": 365, "time_month": 24, "time_year": -1, "lat": -1, "lon": -1}
 # The hist is read ONLY by the indices' base period (1961-1990, 4 vars): a
 # -1 chunk would force whole-13.3 GB reads per var; 10-year chunks let the
 # 30-year window read just its ~3 chunks per var (~13 GB total instead of 53).
@@ -111,6 +112,64 @@ def find_full_dir() -> Path:
             "full-res files not found under /kaggle/input — attach the dataset "
             "dtdoww/climx-full-resolution-data as a notebook input (Data -> Add Input).")
     return hits[0].parent
+
+
+def write_y_cache_direct(full_dir: Path, encoding: dict) -> None:
+    """Write the y cache by reading each raw target variable with ONE direct
+    netCDF4 call — bypassing dask/h5netcdf entirely.
+
+    The mount does ~26 MB/s on contiguous reads (dd) but ~2 MB/s on
+    h5netcdf's native-chunk walk, regardless of dask chunking (observed:
+    ~20 min per variable at both 365-day and single-chunk dask). netCDF4's
+    whole-variable read is one contiguous hyperslab. Transforms applied
+    in-memory with the frozen params: log10(x + eps) for pr/huss, then
+    (x - mean)/std — exactly the starter's semantics. Memory ~9 GB
+    transient per variable (29 GB RAM instance).
+    """
+    from netCDF4 import Dataset as NCDataset
+    import numpy as np
+    sc = json.load(open(SCALING_JSON))["scaling_params"]
+    LOG_EPS = 1e-6
+    PREFIX = "NorESM2-MM_r1i1p1f1_with_forcing_"
+    plan = [(s, v) for s in SCENARIOS for v in paths.TARGET_VARIABLES]
+    total_gb = len(plan) * 1.16  # 10,463 days fp16 per var after subsample
+    log.info("direct y cache: %d reads — %.1f GB output", len(plan), total_gb)
+    done = 0.0
+    rate = None
+    for i, (scen, var) in enumerate(plan):
+        key = f"y_{var}_{scen}"
+        out = CACHE_DIR / f"{key}.zarr"
+        if out.exists():
+            continue
+        tmp = CACHE_DIR / f".tmp_{key}.zarr"
+        if tmp.exists():
+            shutil.rmtree(tmp)
+        src = full_dir / f"{PREFIX}train_{scen}.nc"
+        log.info("=== direct read %s (%d/%d) ===", key, i + 1, len(plan))
+        t0 = time.time()
+        with NCDataset(str(src)) as nc:
+            raw = nc[var][:]          # (31389, 192, 288) — one contiguous read
+            time_c = nc["time"][::3]
+            lat = nc["lat"][:]
+            lon = nc["lon"][:]
+        arr = raw[::3].astype(np.float32)
+        del raw
+        if var in ("pr", "huss"):
+            arr = np.log10(arr + LOG_EPS)
+        arr = (arr - sc[var]["mean"]) / sc[var]["std"]
+        da = xr.DataArray(arr.astype("float16"), dims=("time", "lat", "lon"),
+                          coords={"time": time_c, "lat": lat, "lon": lon},
+                          name=var)
+        ds_out = xr.Dataset({var: da})
+        ds_out.chunk({"time": 128, "lat": -1, "lon": -1}).to_zarr(
+            tmp, mode="w", encoding={var: encoding})
+        tmp.rename(out)
+        mins = (time.time() - t0) / 60
+        rate = 1.16 / mins
+        done += 1.16
+        eta_h = (total_gb - done) / rate / 60 if rate else float("nan")
+        log.info("OK %s: %.1f min (%.2f GB/min) | done %.1f/%.1f GB | ETA %.1f h",
+                 key, mins, rate, done, total_gb, eta_h)
 
 
 def main():
@@ -304,7 +363,7 @@ def main():
                      key, mins, rate, done_gb, total_gb, eta_h)
 
     write_cache(X_scaled, "X")
-    write_cache(y_scaled, "y")
+    write_y_cache_direct(full_dir, ENCODING)
 
     # 5. Fit from the cache (GPU, 1 device — DDP hangs on the 2-GPU box).
     set_seed(42)
@@ -325,20 +384,15 @@ def main():
     emulator.save("/tmp/full_unet.pt")
 
     # 6. Evaluate: predict + reversal + FULL index computation + submission.
-    # Threads scheduler for this stage: everything it touches is local/in-
-    # memory (X_test.nc, in-memory predictions, lazy hist) — no shared remote
-    # handles — and the 15 xclim indices parallelize ~4x. The zarr prediction
-    # write goes through zarr v3's own async machinery, not the WSL-era
-    # dask.array.store path that deadlocked on this machine.
-    import dask
-    with dask.config.set(scheduler="threads"):
-        y_phys, indices_pred = stage(
-            "evaluate (indices ON, SSP2-4.5 2081-2100)", lambda: emulator.evaluate(
-                X_test, metadata_test,
-                results_path=Path("/tmp/full_unet_evaluation.json"),
-                predictions_path=Path("/tmp/full_unet_predictions.zarr"),
-                historical_data_path=ds.hist, TARGET_VARIABLES=paths.TARGET_VARIABLES,
-                LOAD_PREDICTIONS=False, compute_indices=True))
+    # SINGLE-threaded dask on purpose: the threads scheduler blew the RAM
+    # during predict/indices (the run died right after "Making predictions").
+    y_phys, indices_pred = stage(
+        "evaluate (indices ON, SSP2-4.5 2081-2100)", lambda: emulator.evaluate(
+            X_test, metadata_test,
+            results_path=Path("/tmp/full_unet_evaluation.json"),
+            predictions_path=Path("/tmp/full_unet_predictions.zarr"),
+            historical_data_path=ds.hist, TARGET_VARIABLES=paths.TARGET_VARIABLES,
+            LOAD_PREDICTIONS=False, compute_indices=True))
     parquet = stage("build submission parquet", lambda: submission.build_submission(
         indices_pred, "unet_full"))
     report = submission.verify_parquet(parquet)
