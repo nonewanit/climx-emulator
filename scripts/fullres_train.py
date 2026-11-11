@@ -115,27 +115,26 @@ def find_full_dir() -> Path:
 
 
 def write_y_cache_direct(full_dir: Path, encoding: dict) -> None:
-    """Write the y cache by reading each raw target variable with ONE direct
-    netCDF4 call — bypassing dask/h5netcdf entirely.
+    """Write the y cache with SLAB-BASED direct netCDF4 reads.
 
     The mount does ~26 MB/s on contiguous reads (dd) but ~2 MB/s on
-    h5netcdf's native-chunk walk, regardless of dask chunking (observed:
-    ~20 min per variable at both 365-day and single-chunk dask). netCDF4's
-    whole-variable read is one contiguous hyperslab. Transforms applied
-    in-memory with the frozen params: log10(x + eps) for pr/huss, then
-    (x - mean)/std — exactly the starter's semantics. Memory ~9 GB
-    transient per variable (29 GB RAM instance).
+    h5netcdf's native-chunk walk, regardless of dask chunking. netCDF4's
+    slab read (`nc[var][t0:t1]`) is a contiguous hyperslab — the dd
+    pattern. Slabs of 1000 days keep memory bounded (~220 MB transient):
+    the single whole-var read OOM'd the notebook (6.9 GB in one gulp).
+    Transforms match the starter exactly: log10(x + eps) for pr/huss,
+    then (x - mean)/std, using the frozen params.
     """
     from netCDF4 import Dataset as NCDataset
     import numpy as np
     sc = json.load(open(SCALING_JSON))["scaling_params"]
     LOG_EPS = 1e-6
     PREFIX = "NorESM2-MM_r1i1p1f1_with_forcing_"
+    SLAB = 1000
     plan = [(s, v) for s in SCENARIOS for v in paths.TARGET_VARIABLES]
     total_gb = len(plan) * 1.16  # 10,463 days fp16 per var after subsample
-    log.info("direct y cache: %d reads — %.1f GB output", len(plan), total_gb)
+    log.info("slab y cache: %d reads — %.1f GB output", len(plan), total_gb)
     done = 0.0
-    rate = None
     for i, (scen, var) in enumerate(plan):
         key = f"y_{var}_{scen}"
         out = CACHE_DIR / f"{key}.zarr"
@@ -145,19 +144,23 @@ def write_y_cache_direct(full_dir: Path, encoding: dict) -> None:
         if tmp.exists():
             shutil.rmtree(tmp)
         src = full_dir / f"{PREFIX}train_{scen}.nc"
-        log.info("=== direct read %s (%d/%d) ===", key, i + 1, len(plan))
+        log.info("=== slab read %s (%d/%d) ===", key, i + 1, len(plan))
         t0 = time.time()
+        slabs = []
         with NCDataset(str(src)) as nc:
-            raw = nc[var][:]          # (31389, 192, 288) — one contiguous read
+            n = len(nc["time"])
             time_c = nc["time"][::3]
             lat = nc["lat"][:]
             lon = nc["lon"][:]
-        arr = raw[::3].astype(np.float32)
-        del raw
-        if var in ("pr", "huss"):
-            arr = np.log10(arr + LOG_EPS)
-        arr = (arr - sc[var]["mean"]) / sc[var]["std"]
-        da = xr.DataArray(arr.astype("float16"), dims=("time", "lat", "lon"),
+            for s0 in range(0, n, SLAB):
+                s = nc[var][s0:s0 + SLAB][::3].astype(np.float32)
+                if var in ("pr", "huss"):
+                    s = np.log10(s + LOG_EPS)
+                s = (s - sc[var]["mean"]) / sc[var]["std"]
+                slabs.append(s.astype("float16"))
+        arr = np.concatenate(slabs, axis=0)
+        del slabs
+        da = xr.DataArray(arr, dims=("time", "lat", "lon"),
                           coords={"time": time_c, "lat": lat, "lon": lon},
                           name=var)
         ds_out = xr.Dataset({var: da})
@@ -383,16 +386,28 @@ def main():
             logger=False)))
     emulator.save("/tmp/full_unet.pt")
 
-    # 6. Evaluate: predict + reversal + FULL index computation + submission.
-    # SINGLE-threaded dask on purpose: the threads scheduler blew the RAM
-    # during predict/indices (the run died right after "Making predictions").
-    y_phys, indices_pred = stage(
-        "evaluate (indices ON, SSP2-4.5 2081-2100)", lambda: emulator.evaluate(
+    # 6. Evaluate in TWO passes so the ~11 GB of in-memory predictions never
+    # coexists with the index computations (the notebook OOM'd mid-predict).
+    # Pass 1 = predict + reversal + save to zarr; pass 2 = load the saved
+    # predictions CHUNKED and compute the 15 indices with bounded memory.
+    PRED_PATH = Path("/tmp/full_unet_predictions.zarr")
+    y_phys, _ = stage(
+        "evaluate pass 1 (predict + reversal + save)", lambda: emulator.evaluate(
             X_test, metadata_test,
             results_path=Path("/tmp/full_unet_evaluation.json"),
-            predictions_path=Path("/tmp/full_unet_predictions.zarr"),
+            predictions_path=PRED_PATH,
             historical_data_path=ds.hist, TARGET_VARIABLES=paths.TARGET_VARIABLES,
-            LOAD_PREDICTIONS=False, compute_indices=True))
+            LOAD_PREDICTIONS=False, compute_indices=False))
+    del y_phys
+    import gc
+    gc.collect()
+    _, indices_pred = stage(
+        "evaluate pass 2 (indices from saved predictions)", lambda: emulator.evaluate(
+            X_test, metadata_test,
+            results_path=Path("/tmp/full_unet_evaluation.json"),
+            predictions_path=PRED_PATH,
+            historical_data_path=ds.hist, TARGET_VARIABLES=paths.TARGET_VARIABLES,
+            LOAD_PREDICTIONS=True, compute_indices=True))
     parquet = stage("build submission parquet", lambda: submission.build_submission(
         indices_pred, "unet_full"))
     report = submission.verify_parquet(parquet)
