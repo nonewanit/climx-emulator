@@ -14,7 +14,7 @@ GPU training sessions then attach those datasets and plain-copy them to
 /tmp (sequential copies at the mount's ~26 MB/s) — no slow reads, no
 re-preprocessing, no raw 171 GB input needed.
 
-Run:  %run scripts/full_cache.py [--subsample 3]
+Run:  %run scripts/full_cache.py [--subsample 1]  (default 1 = Phase B+C)
 """
 
 import argparse
