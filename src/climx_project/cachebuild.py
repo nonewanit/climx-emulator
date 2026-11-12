@@ -201,28 +201,38 @@ def _upload_one(batch: list[Path], owner: str, manifest_path: Path, manifest: di
     if stage.exists():
         shutil.rmtree(stage)
     stage.mkdir(parents=True)
+    import zipfile
     for p in batch:
-        # zarr stores are DIRECTORIES
-        if p.is_dir():
-            shutil.copytree(p, stage / p.name)
+        if p.is_dir():  # zarr stores are dirs; the CLI skips dirs -> zip them
+            zf = zipfile.ZipFile(stage / f"{p.name}.zip", "w",
+                                 compression=zipfile.ZIP_STORED)
+            for f in sorted(p.rglob("*")):
+                if f.is_file():
+                    zf.write(f, f.relative_to(p))
+            zf.close()
         else:
             shutil.copy2(p, stage / p.name)
+    # CLI v2: metadata file is datasets-metadata.json (plural); private is
+    # the default (no --private flag exists).
     meta = {"title": f"climx-cache-b{idx}", "id": slug,
             "licenses": [{"name": "CC-BY-4.0"}]}
-    with open(stage / "dataset-metadata.json", "w") as f:
+    with open(stage / "datasets-metadata.json", "w") as f:
         json.dump(meta, f, indent=2)
     gb = sum(_dir_size(p) for p in batch) / 1e9
     log.info("=== upload batch %d (%s): %.1f GB -> %s ===",
              idx, [p.name for p in batch], gb, slug)
     t0 = time.time()
-    subprocess.run(["kaggle", "datasets", "create", "-p", str(stage), "--private"],
+    subprocess.run(["kaggle", "datasets", "create", "-p", str(stage)],
                    check=True)
     log.info("OK upload %s (%.1f min)", slug, (time.time() - t0) / 60)
     manifest[slug] = [p.stem if p.suffix == ".zarr" else p.name for p in batch]
     with open(manifest_path, "w") as f:
         json.dump(manifest, f, indent=2)
     for p in batch:
-        p.unlink()
+        if p.is_dir():
+            shutil.rmtree(p)
+        else:
+            p.unlink()
     shutil.rmtree(stage)
 
 
@@ -270,11 +280,21 @@ def copy_raw_to_tmp(full_dir: Path, dest: Path) -> Path:
 
 
 def copy_datasets_to_cache(mount_dirs, cache_dir: Path) -> None:
-    """Plain-copy attached cache-dataset files to /tmp (sequential reads at
-    the mount's ~26 MB/s — this is the only mount I/O training pays)."""
+    """Copy attached cache-dataset files to /tmp (sequential reads at the
+    mount's ~26 MB/s — the only mount I/O training pays). Zarr stores
+    arrive as <name>.zarr.zip (the upload zipped the dirs); unzip them."""
+    import zipfile
     for d in mount_dirs:
         for p in sorted(Path(d).iterdir()):
-            if p.name.endswith(".zarr") or p.name == "X_test.nc":
+            if p.name.endswith(".zarr.zip"):
+                dst = cache_dir / p.name[:-4]
+                if not dst.exists():
+                    log.info("unzip %s", p.name)
+                    t0 = time.time()
+                    with zipfile.ZipFile(p) as zf:
+                        zf.extractall(cache_dir)
+                    log.info("OK unzip %s (%.1f min)", p.name, (time.time() - t0) / 60)
+            elif p.name.endswith(".zarr") or p.name == "X_test.nc":
                 dst = cache_dir / p.name
                 if not dst.exists():
                     log.info("copy %s", p.name)
