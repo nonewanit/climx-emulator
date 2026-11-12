@@ -217,27 +217,45 @@ def _upload_one(batch: list[Path], owner: str, manifest_path: Path, manifest: di
 
 
 def copy_raw_to_tmp(full_dir: Path, dest: Path) -> Path:
-    """Plain-copy the needed raw NetCDFs from the input mount to /tmp.
+    """Fetch the needed raw NetCDFs to /tmp — huggingface_hub FIRST.
 
-    The mount serves SEQUENTIAL reads at ~26 MB/s (dd) but library reads
-    (h5netcdf/dask chunk walks) at ~1-2 MB/s. A plain cp is one sequential
-    pass per file (~2 h for the 163 GB) after which every read is local
-    disk at ~1 GB/s. Resumable within a session: existing files skipped.
+    Measured on Kaggle: hf_hub_download pulls a 33 GB file in 10-20 min
+    (~30-55 MB/s) — faster than the mount's sequential cp (26 MB/s) and
+    infinitely faster than library reads (~1-2 MB/s). After the download
+    every read is local disk at ~1 GB/s. Falls back to a mount cp if HF
+    fails. Resumable within a session: existing files skipped.
     """
     dest.mkdir(parents=True, exist_ok=True)
     needed = [f"{FULL_PREFIX}{s}.nc" for s in (
         "hist_train_1850_1931", "hist_train_1932_2014",
         "train_ssp126", "train_ssp370", "train_ssp585",
         "test_forcings_ssp245")]
+    try:
+        from huggingface_hub import hf_hub_download
+    except ImportError:
+        hf_hub_download = None
+    hf_tmp = Path("/tmp/hf_tmp")
+    hf_tmp.mkdir(parents=True, exist_ok=True)
     for name in needed:
-        src = full_dir / name
         dst = dest / name
-        if dst.exists() and dst.stat().st_size == src.stat().st_size:
+        if dst.exists() and dst.stat().st_size > 1e9:  # >1 GB = complete-ish
             continue
-        log.info("copy %s (%.1f GB)", name, src.stat().st_size / 1e9)
-        t0 = time.time()
-        shutil.copy2(src, dst)
-        log.info("OK copy %s (%.1f min)", name, (time.time() - t0) / 60)
+        try:
+            t0 = time.time()
+            p = hf_hub_download(
+                repo_id="isp-uv-es/ClimX", repo_type="dataset",
+                filename=f"full/{name}", local_dir=str(hf_tmp))
+            shutil.move(p, dst)
+            log.info("OK hf download %s (%.1f min)", name, (time.time() - t0) / 60)
+        except Exception as e:
+            log.warning("hf download failed (%s) — falling back to mount cp", e)
+            src = full_dir / name
+            if not src.exists():
+                raise FileNotFoundError(
+                    f"{name} not on HF (download failed) nor at {src}")
+            t0 = time.time()
+            shutil.copy2(src, dst)
+            log.info("OK mount copy %s (%.1f min)", name, (time.time() - t0) / 60)
     return dest
 
 
