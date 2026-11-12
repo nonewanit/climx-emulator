@@ -123,7 +123,31 @@ def main():
         ds = None
     else:
         # ---------- build-in-session mode ----------
-        full_dir = Path(os.environ.get("CLIMX_FULL_DIR", str(find_full_dir())))
+        # Download the raw files via HF (measured ~62 MB/s on Kaggle) into
+        # /tmp so every read after is local disk. This is the ONE-SHOT Phase B
+        # path: one notebook, one 9 h session, no datasets, no uploads.
+        mount_dir = Path(os.environ.get("CLIMX_FULL_DIR", str(find_full_dir())))
+        RAW_TMP = Path("/tmp/raw_full")
+        RAW_TMP.mkdir(parents=True, exist_ok=True)
+        PREFIX = "NorESM2-MM_r1i1p1f1_with_forcing_"
+        for n in ("hist_train_1850_1931", "hist_train_1932_2014",
+                  "train_ssp126", "train_ssp370", "train_ssp585",
+                  "test_forcings_ssp245"):
+            dst = RAW_TMP / f"{PREFIX}{n}.nc"
+            if dst.exists() and dst.stat().st_size > 1e9:
+                continue
+            try:
+                from huggingface_hub import hf_hub_download
+                log.info("hf download %s", f"{PREFIX}{n}.nc")
+                p = hf_hub_download(
+                    repo_id="isp-uv-es/ClimX", repo_type="dataset",
+                    filename=f"full/{PREFIX}{n}.nc",
+                    local_dir=str(Path("/tmp/hf_tmp")))
+                shutil.move(p, dst)
+            except Exception as e:
+                log.warning("hf download failed (%s) — mount copy fallback", e)
+                shutil.copy2(mount_dir / f"{PREFIX}{n}.nc", dst)
+        full_dir = RAW_TMP
         log.info("full-res data dir: %s", full_dir)
         ds = stage("open local full-res datasets", lambda: open_full_datasets_local(
             full_dir, scenarios=SCENARIOS))
