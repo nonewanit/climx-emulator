@@ -157,15 +157,18 @@ def open_hist_from_cache(cache_dir: Path) -> xr.Dataset:
 
 
 def upload_batches(cache_dir: Path, owner: str, manifest_path: Path,
-                   batch_gb: float = 18.0) -> dict:
+                   batch_gb: float = 18.0,
+                   slug_prefix: str = "climx-cache-b") -> dict:
     """Upload cache files in ~batch_gb batches as private Kaggle datasets
-    (climx-cache-b1, -b2, ...), DELETING each batch from /tmp afterwards.
+    (slug_prefix + idx), DELETING each batch from /tmp afterwards.
 
     This interleaves with the build (call it after each phase): the
     subsample-1 cache is ~170-200 GB — too big for one dataset and for one
     9 h session — and a session kill only loses the batch in flight.
-    The manifest ({slug: [stems]}) persists at manifest_path; earlier
-    sessions' batches are skipped."""
+    Parallel workers (one per scenario) pass distinct slug_prefixes
+    (e.g. climx-cache-ssp126-b) and distinct manifest paths, so concurrent
+    uploads never collide. The manifest ({slug: [stems]}) persists at
+    manifest_path; earlier sessions' batches are skipped."""
     manifest = {}
     if manifest_path.exists():
         manifest = json.load(open(manifest_path))
@@ -179,12 +182,12 @@ def upload_batches(cache_dir: Path, owner: str, manifest_path: Path,
     for p in files:
         gb = _dir_size(p) / 1e9
         if batch and batch_size + gb > batch_gb:
-            _upload_one(batch, owner, manifest_path, manifest)
+            _upload_one(batch, owner, manifest_path, manifest, slug_prefix)
             batch, batch_size = [], 0.0
         batch.append(p)
         batch_size += gb
     if batch:
-        _upload_one(batch, owner, manifest_path, manifest)
+        _upload_one(batch, owner, manifest_path, manifest, slug_prefix)
     return manifest
 
 
@@ -194,9 +197,10 @@ def _dir_size(p: Path) -> float:
     return p.stat().st_size
 
 
-def _upload_one(batch: list[Path], owner: str, manifest_path: Path, manifest: dict) -> None:
+def _upload_one(batch: list[Path], owner: str, manifest_path: Path, manifest: dict,
+                slug_prefix: str = "climx-cache-b") -> None:
     idx = len(manifest) + 1
-    slug = f"{owner}/climx-cache-b{idx}"
+    slug = f"{owner}/{slug_prefix}{idx}"
     stage = Path("/tmp/upload_stage")
     if stage.exists():
         shutil.rmtree(stage)
@@ -217,7 +221,7 @@ def _upload_one(batch: list[Path], owner: str, manifest_path: Path, manifest: di
     # CLI v2.2.5: metadata file is dataset-metadata.json (SINGULAR — verified
     # against the CLI's own error message); private is the default (there is
     # no --private flag).
-    meta = {"title": f"climx-cache-b{idx}", "id": slug,
+    meta = {"title": f"{slug_prefix}{idx}", "id": slug,
             "licenses": [{"name": "CC-BY-4.0"}]}
     with open(stage / "dataset-metadata.json", "w") as f:
         json.dump(meta, f, indent=2)
