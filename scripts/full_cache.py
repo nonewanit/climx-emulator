@@ -131,6 +131,7 @@ def main():
         at a time so the CPU session's small overlay never holds everything."""
         from huggingface_hub import hf_hub_download
         dst = Path("/tmp/raw_full") / name
+        dst.parent.mkdir(parents=True, exist_ok=True)
         if dst.exists() and dst.stat().st_size > 1e9:
             return dst
         t0 = time.time()
