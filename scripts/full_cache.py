@@ -32,7 +32,7 @@ import xarray as xr
 import climx_project  # noqa: F401
 from climx_project import paths
 from climx_project.cachebuild import (
-    open_hist_from_cache, upload_cache, write_cache_x, write_cache_y,
+    open_hist_from_cache, upload_batches, write_cache_x, write_cache_y,
     write_hist_window)
 from climx_project.cacheio import zarr_fp16_encoding
 from climx_project.data import daily_forcings, open_full_datasets_local
@@ -83,7 +83,7 @@ def find_full_dir() -> Path:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--subsample", type=int, default=3)
+    ap.add_argument("--subsample", type=int, default=1)
     args = ap.parse_args()
 
     paths.ensure_dirs()

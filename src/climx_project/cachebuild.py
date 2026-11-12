@@ -23,13 +23,18 @@ TARGETS = ["huss", "pr", "psl", "sfcWind", "tas", "tasmax", "tasmin"]
 FULL_PREFIX = "NorESM2-MM_r1i1p1f1_with_forcing_"
 
 
-def write_cache_x(X_scaled, cache_dir: Path, scenarios, encoding: dict) -> None:
+def write_cache_x(X_scaled, cache_dir: Path, scenarios, encoding: dict,
+                  skip: set | None = None) -> None:
     """X cache: one compute per (scenario, var); 1D GHGs broadcast to the
     grid; 128-day output chunks. X sources are small (monthly/yearly) so
-    this is fast even through the mount."""
+    this is fast even through the mount. `skip` = keys already uploaded
+    (session-resume via the manifest)."""
+    skip = skip or set()
     plan = [(s, n) for s in scenarios for n in X_scaled.data_vars]
     for i, (scen, name) in enumerate(plan):
         key = f"X_{name}_{scen}"
+        if key in skip:
+            continue
         out = cache_dir / f"{key}.zarr"
         if out.exists():
             continue
@@ -50,7 +55,8 @@ def write_cache_x(X_scaled, cache_dir: Path, scenarios, encoding: dict) -> None:
 
 
 def write_cache_y(full_dir: Path, cache_dir: Path, scenarios,
-                  encoding: dict, scaling_json: Path) -> None:
+                  encoding: dict, scaling_json: Path,
+                  skip: set | None = None) -> None:
     """y cache: SLAB-BASED direct netCDF4 reads (1,000-day contiguous
     hyperslabs — the mount's fast pattern — with ~220 MB transient memory).
     Transforms match the starter exactly: log10(x+eps) for pr/huss, then
@@ -59,9 +65,12 @@ def write_cache_y(full_dir: Path, cache_dir: Path, scenarios,
 
     sc = json.load(open(scaling_json))["scaling_params"]
     SLAB = 1000
+    skip = skip or set()
     plan = [(s, v) for s in scenarios for v in TARGETS]
     for i, (scen, var) in enumerate(plan):
         key = f"y_{var}_{scen}"
+        if key in skip:
+            continue
         out = cache_dir / f"{key}.zarr"
         if out.exists():
             continue
@@ -96,7 +105,7 @@ def write_cache_y(full_dir: Path, cache_dir: Path, scenarios,
 
 def write_hist_window(hist_ds, cache_dir: Path, encoding: dict,
                       lo: str = "1961-01-01", hi: str = "1990-12-31",
-                      margin_days: int = 10) -> None:
+                      margin_days: int = 10, skip: set | None = None) -> None:
     """fp16 hist targets over the indices' base period (+margin for the
     doy window) — the ONLY hist the evaluate ever reads. ~5-6 GB total."""
     sel = hist_ds.sel(time=slice(lo, hi))
@@ -106,7 +115,10 @@ def write_hist_window(hist_ds, cache_dir: Path, encoding: dict,
     i0 = max(0, int(np.flatnonzero(t >= lo_v)[0]) - margin_days)
     i1 = min(len(t), int(np.flatnonzero(t <= hi_v)[-1]) + margin_days + 1)
     win = hist_ds.isel(time=slice(i0, i1))
+    skip = skip or set()
     for var in TARGETS:
+        if f"hist_{var}" in skip:
+            continue
         out = cache_dir / f"hist_{var}.zarr"
         if out.exists():
             continue
@@ -135,50 +147,64 @@ def open_hist_from_cache(cache_dir: Path) -> xr.Dataset:
     return ds
 
 
-def upload_cache(cache_dir: Path, owner: str, manifest_path: Path) -> dict:
-    """Upload ALL cache files as ONE private Kaggle dataset (climx-cache).
+def upload_batches(cache_dir: Path, owner: str, manifest_path: Path,
+                   batch_gb: float = 18.0) -> dict:
+    """Upload cache files in ~batch_gb batches as private Kaggle datasets
+    (climx-cache-b1, -b2, ...), DELETING each batch from /tmp afterwards.
 
-    One dataset keeps the training-side attach step trivial; the compressed
-    cache (~50-70 GB) fits Kaggle's per-dataset allowance (the raw
-    competition dataset is 171 GB). If the platform rejects the size,
-    split into multiple datasets then. Manifest ({slug: [files]}) persists
-    at manifest_path and is returned."""
+    This interleaves with the build (call it after each phase): the
+    subsample-1 cache is ~170-200 GB — too big for one dataset and for one
+    9 h session — and a session kill only loses the batch in flight.
+    The manifest ({slug: [stems]}) persists at manifest_path; earlier
+    sessions' batches are skipped."""
     manifest = {}
     if manifest_path.exists():
         manifest = json.load(open(manifest_path))
     uploaded = {f for files in manifest.values() for f in files}
     files = sorted([p for p in cache_dir.iterdir()
                     if (p.name.endswith(".zarr") or p.name == "X_test.nc")
-                    and p.name not in uploaded
+                    and (p.stem if p.suffix == ".zarr" else p.name) not in uploaded
                     and not p.name.startswith(".tmp")],
                    key=lambda p: p.name)
-    if not files:
-        log.info("nothing to upload")
-        return manifest
-    slug = f"{owner}/climx-cache"
+    batch, batch_size = [], 0.0
+    for p in files:
+        gb = p.stat().st_size / 1e9
+        if batch and batch_size + gb > batch_gb:
+            _upload_one(batch, owner, manifest_path, manifest)
+            batch, batch_size = [], 0.0
+        batch.append(p)
+        batch_size += gb
+    if batch:
+        _upload_one(batch, owner, manifest_path, manifest)
+    return manifest
+
+
+def _upload_one(batch: list[Path], owner: str, manifest_path: Path, manifest: dict) -> None:
+    idx = len(manifest) + 1
+    slug = f"{owner}/climx-cache-b{idx}"
     stage = Path("/tmp/upload_stage")
     if stage.exists():
         shutil.rmtree(stage)
     stage.mkdir(parents=True)
-    for p in files:
+    for p in batch:
         shutil.copy2(p, stage / p.name)
-    meta = {"title": "climx-cache", "id": slug,
+    meta = {"title": f"climx-cache-b{idx}", "id": slug,
             "licenses": [{"name": "CC-BY-4.0"}]}
     with open(stage / "dataset-metadata.json", "w") as f:
         json.dump(meta, f, indent=2)
-    gb = sum(p.stat().st_size for p in files) / 1e9
-    log.info("=== upload %d files (%.1f GB) -> %s ===", len(files), gb, slug)
+    gb = sum(p.stat().st_size for p in batch) / 1e9
+    log.info("=== upload batch %d (%s): %.1f GB -> %s ===",
+             idx, [p.name for p in batch], gb, slug)
     t0 = time.time()
     subprocess.run(["kaggle", "datasets", "create", "-p", str(stage), "--private"],
                    check=True)
     log.info("OK upload %s (%.1f min)", slug, (time.time() - t0) / 60)
-    manifest[slug] = [p.name for p in files]
+    manifest[slug] = [p.stem if p.suffix == ".zarr" else p.name for p in batch]
     with open(manifest_path, "w") as f:
         json.dump(manifest, f, indent=2)
-    for p in files:
+    for p in batch:
         p.unlink()
     shutil.rmtree(stage)
-    return manifest
 
 
 def copy_datasets_to_cache(mount_dirs, cache_dir: Path) -> None:
