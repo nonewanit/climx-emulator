@@ -83,26 +83,35 @@ def write_cache_y(full_dir: Path, cache_dir: Path, scenarios,
             shutil.rmtree(tmp)
         log.info("=== slab read %s (%d/%d) ===", key, i + 1, len(plan))
         t0 = time.time()
-        slabs = []
+        # INCREMENTAL zarr appends: CPU sessions have small RAM (~4 GB) —
+        # never hold the full variable in memory (~0.5 GB peak per slab).
         with NCDataset(str(full_dir / f"{FULL_PREFIX}train_{scen}.nc")) as nc:
             n = len(nc["time"])
             time_c = nc["time"][::3]
             lat = nc["lat"][:]
             lon = nc["lon"][:]
+            first = True
+            idx = 0
             for s0 in range(0, n, SLAB):
                 s = nc[var][s0:s0 + SLAB][::3].astype(np.float32)
                 if var in ("pr", "huss"):
                     s = np.log10(s + 1e-6)
                 s = (s - sc[var]["mean"]) / sc[var]["std"]
-                slabs.append(s.astype("float16"))
-        arr = np.concatenate(slabs, axis=0)
-        del slabs
-        da = xr.DataArray(arr, dims=("time", "lat", "lon"),
-                          coords={"time": time_c, "lat": lat, "lon": lon},
-                          name=var)
-        ds_out = xr.Dataset({var: da})
-        ds_out.chunk({"time": 128, "lat": -1, "lon": -1}).to_zarr(
-            tmp, mode="w", encoding={var: encoding})
+                s16 = s.astype("float16")
+                del s
+                da = xr.DataArray(s16, dims=("time", "lat", "lon"),
+                                  coords={"time": time_c[idx:idx + len(s16)],
+                                          "lat": lat, "lon": lon},
+                                  name=var)
+                ds_slab = xr.Dataset({var: da}).chunk(
+                    {"time": 128, "lat": -1, "lon": -1})
+                if first:
+                    ds_slab.to_zarr(tmp, mode="w", encoding={var: encoding})
+                    first = False
+                else:
+                    ds_slab.to_zarr(tmp, mode="a", append_dim="time")
+                idx += len(s16)
+                del s16, da, ds_slab
         tmp.rename(out)
         log.info("OK %s (%.1f min)", key, (time.time() - t0) / 60)
         if flush:
@@ -134,9 +143,9 @@ def write_hist_window(hist_ds, cache_dir: Path, encoding: dict,
             shutil.rmtree(tmp)
         log.info("=== write hist window %s ===", var)
         da = win[var]
-        arr = da.compute().values.astype("float16")
-        ds_out = xr.Dataset({var: (da.dims, arr)}, coords=da.coords)
-        ds_out.chunk({"time": 128, "lat": -1, "lon": -1}).to_zarr(
+        # chunked write (no full-array materialization): CPU sessions have
+        # small RAM; the hist file is LOCAL so chunk-walk speed is irrelevant.
+        da.astype("float16").chunk({"time": 128, "lat": -1, "lon": -1}).to_zarr(
             tmp, mode="w", encoding={var: encoding})
         tmp.rename(out)
         if flush:
