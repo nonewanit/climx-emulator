@@ -212,18 +212,23 @@ def _upload_one(batch: list[Path], owner: str, manifest_path: Path, manifest: di
             zf.close()
         else:
             shutil.copy2(p, stage / p.name)
-    # CLI v2: metadata file is datasets-metadata.json (plural); private is
-    # the default (no --private flag exists).
+    # CLI v2.2.5: metadata file is dataset-metadata.json (SINGULAR — verified
+    # against the CLI's own error message); private is the default (there is
+    # no --private flag).
     meta = {"title": f"climx-cache-b{idx}", "id": slug,
             "licenses": [{"name": "CC-BY-4.0"}]}
-    with open(stage / "datasets-metadata.json", "w") as f:
+    with open(stage / "dataset-metadata.json", "w") as f:
         json.dump(meta, f, indent=2)
     gb = sum(_dir_size(p) for p in batch) / 1e9
     log.info("=== upload batch %d (%s): %.1f GB -> %s ===",
              idx, [p.name for p in batch], gb, slug)
     t0 = time.time()
-    subprocess.run(["kaggle", "datasets", "create", "-p", str(stage)],
-                   check=True)
+    r = subprocess.run(["kaggle", "datasets", "create", "-p", str(stage)],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        log.error("datasets create failed (exit %d):\nSTDOUT: %s\nSTDERR: %s",
+                  r.returncode, r.stdout, r.stderr)
+        raise RuntimeError(f"kaggle datasets create failed: {r.stderr or r.stdout}")
     log.info("OK upload %s (%.1f min)", slug, (time.time() - t0) / 60)
     manifest[slug] = [p.stem if p.suffix == ".zarr" else p.name for p in batch]
     with open(manifest_path, "w") as f:
