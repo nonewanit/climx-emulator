@@ -32,8 +32,8 @@ import xarray as xr
 import climx_project  # noqa: F401
 from climx_project import paths
 from climx_project.cachebuild import (
-    open_hist_from_cache, upload_batches, write_cache_x, write_cache_y,
-    write_hist_window)
+    copy_raw_to_tmp, open_hist_from_cache, upload_batches,
+    write_cache_x, write_cache_y, write_hist_window)
 from climx_project.cacheio import zarr_fp16_encoding
 from climx_project.data import daily_forcings, open_full_datasets_local
 from src.data_preprocessing.preprocessing import preprocess_train
@@ -93,6 +93,12 @@ def main():
     log.info("disk:\n%s", subprocess.run(["df", "-h", "/tmp", "/kaggle/working"],
                                          capture_output=True, text=True).stdout)
 
+    # Copy the raw files to /tmp first: the mount does ~26 MB/s on one
+    # sequential pass (cp) but ~1-2 MB/s on library chunk walks. After the
+    # copy, every read is local disk (~1 GB/s) — the y cache drops from
+    # hours to minutes.
+    full_dir = stage("copy raw files to /tmp (sequential)", lambda:
+                     copy_raw_to_tmp(full_dir, Path("/tmp/raw_full")))
     ds = stage("open local full-res datasets", lambda: open_full_datasets_local(
         full_dir, scenarios=SCENARIOS))
     ds.hist = ds.hist.chunk(_HIST_CHUNKS)

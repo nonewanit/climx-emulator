@@ -216,6 +216,31 @@ def _upload_one(batch: list[Path], owner: str, manifest_path: Path, manifest: di
     shutil.rmtree(stage)
 
 
+def copy_raw_to_tmp(full_dir: Path, dest: Path) -> Path:
+    """Plain-copy the needed raw NetCDFs from the input mount to /tmp.
+
+    The mount serves SEQUENTIAL reads at ~26 MB/s (dd) but library reads
+    (h5netcdf/dask chunk walks) at ~1-2 MB/s. A plain cp is one sequential
+    pass per file (~2 h for the 163 GB) after which every read is local
+    disk at ~1 GB/s. Resumable within a session: existing files skipped.
+    """
+    dest.mkdir(parents=True, exist_ok=True)
+    needed = [f"{FULL_PREFIX}{s}.nc" for s in (
+        "hist_train_1850_1931", "hist_train_1932_2014",
+        "train_ssp126", "train_ssp370", "train_ssp585",
+        "test_forcings_ssp245")]
+    for name in needed:
+        src = full_dir / name
+        dst = dest / name
+        if dst.exists() and dst.stat().st_size == src.stat().st_size:
+            continue
+        log.info("copy %s (%.1f GB)", name, src.stat().st_size / 1e9)
+        t0 = time.time()
+        shutil.copy2(src, dst)
+        log.info("OK copy %s (%.1f min)", name, (time.time() - t0) / 60)
+    return dest
+
+
 def copy_datasets_to_cache(mount_dirs, cache_dir: Path) -> None:
     """Plain-copy attached cache-dataset files to /tmp (sequential reads at
     the mount's ~26 MB/s — this is the only mount I/O training pays)."""
