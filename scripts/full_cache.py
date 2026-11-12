@@ -120,7 +120,11 @@ def main():
     def maybe_upload():
         # upload completed files once ~18 GB has accumulated — a session kill
         # loses at most the un-uploaded remainder (~one batch)
-        pending = sum(p.stat().st_size for p in CACHE_DIR.iterdir()
+        def _sz(p):
+            if p.is_dir():
+                return sum(f.stat().st_size for f in p.rglob("*") if f.is_file())
+            return p.stat().st_size
+        pending = sum(_sz(p) for p in CACHE_DIR.iterdir()
                       if (p.name.endswith(".zarr") or p.name == "X_test.nc")
                       and not p.name.startswith(".tmp"))
         if pending >= 18e9:

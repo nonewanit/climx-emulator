@@ -177,7 +177,7 @@ def upload_batches(cache_dir: Path, owner: str, manifest_path: Path,
                    key=lambda p: p.name)
     batch, batch_size = [], 0.0
     for p in files:
-        gb = p.stat().st_size / 1e9
+        gb = _dir_size(p) / 1e9
         if batch and batch_size + gb > batch_gb:
             _upload_one(batch, owner, manifest_path, manifest)
             batch, batch_size = [], 0.0
@@ -188,6 +188,12 @@ def upload_batches(cache_dir: Path, owner: str, manifest_path: Path,
     return manifest
 
 
+def _dir_size(p: Path) -> float:
+    if p.is_dir():
+        return sum(f.stat().st_size for f in p.rglob("*") if f.is_file())
+    return p.stat().st_size
+
+
 def _upload_one(batch: list[Path], owner: str, manifest_path: Path, manifest: dict) -> None:
     idx = len(manifest) + 1
     slug = f"{owner}/climx-cache-b{idx}"
@@ -196,12 +202,16 @@ def _upload_one(batch: list[Path], owner: str, manifest_path: Path, manifest: di
         shutil.rmtree(stage)
     stage.mkdir(parents=True)
     for p in batch:
-        shutil.copy2(p, stage / p.name)
+        # zarr stores are DIRECTORIES
+        if p.is_dir():
+            shutil.copytree(p, stage / p.name)
+        else:
+            shutil.copy2(p, stage / p.name)
     meta = {"title": f"climx-cache-b{idx}", "id": slug,
             "licenses": [{"name": "CC-BY-4.0"}]}
     with open(stage / "dataset-metadata.json", "w") as f:
         json.dump(meta, f, indent=2)
-    gb = sum(p.stat().st_size for p in batch) / 1e9
+    gb = sum(_dir_size(p) for p in batch) / 1e9
     log.info("=== upload batch %d (%s): %.1f GB -> %s ===",
              idx, [p.name for p in batch], gb, slug)
     t0 = time.time()
