@@ -198,9 +198,9 @@ def _dir_size(p: Path) -> float:
 
 
 def _upload_one(batch: list[Path], owner: str, manifest_path: Path, manifest: dict,
-                slug_prefix: str = "climx-cache-b") -> None:
+                slug_prefix: str = "climx-cache-b", numbered: bool = True) -> None:
     idx = len(manifest) + 1
-    slug = f"{owner}/{slug_prefix}{idx}"
+    slug = f"{owner}/{slug_prefix}{idx if numbered else ''}"
     stage = Path("/tmp/upload_stage")
     if stage.exists():
         shutil.rmtree(stage)
@@ -221,7 +221,7 @@ def _upload_one(batch: list[Path], owner: str, manifest_path: Path, manifest: di
     # CLI v2.2.5: metadata file is dataset-metadata.json (SINGULAR — verified
     # against the CLI's own error message); private is the default (there is
     # no --private flag).
-    meta = {"title": f"{slug_prefix}{idx}", "id": slug,
+    meta = {"title": f"{slug_prefix}{idx if numbered else ''}", "id": slug,
             "licenses": [{"name": "CC-BY-4.0"}]}
     with open(stage / "dataset-metadata.json", "w") as f:
         json.dump(meta, f, indent=2)
@@ -288,6 +288,30 @@ def copy_raw_to_tmp(full_dir: Path, dest: Path) -> Path:
             shutil.copy2(src, dst)
             log.info("OK mount copy %s (%.1f min)", name, (time.time() - t0) / 60)
     return dest
+
+
+def upload_cache(cache_dir: Path, owner: str, manifest_path: Path,
+                 slug_prefix: str = "climx-cache") -> dict:
+    """Upload ALL files in cache_dir as ONE private dataset (owner/slug_prefix).
+
+    Per-scenario caches are ~60-80 GB compressed — one dataset each is
+    clean and under the per-dataset allowance; the worker build (~3-4 h)
+    fits the 9 h session cap, so end-of-build upload is fine."""
+    manifest = {}
+    if manifest_path.exists():
+        manifest = json.load(open(manifest_path))
+    uploaded = {f for files in manifest.values() for f in files}
+    files = sorted([p for p in cache_dir.iterdir()
+                    if (p.name.endswith(".zarr") or p.name == "X_test.nc")
+                    and (p.stem if p.suffix == ".zarr" else p.name) not in uploaded
+                    and not p.name.startswith(".tmp")],
+                   key=lambda p: p.name)
+    if not files:
+        log.info("nothing to upload")
+        return manifest
+    _upload_one(files, owner, manifest_path, manifest,
+                slug_prefix=slug_prefix, numbered=False)
+    return json.load(open(manifest_path))
 
 
 def copy_datasets_to_cache(mount_dirs, cache_dir: Path) -> None:

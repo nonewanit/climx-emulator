@@ -32,7 +32,7 @@ import xarray as xr
 import climx_project  # noqa: F401
 from climx_project import paths
 from climx_project.cachebuild import (
-    upload_batches, write_cache_x, write_cache_y, write_hist_window)
+    upload_cache, write_cache_x, write_cache_y, write_hist_window)
 from climx_project.cacheio import zarr_fp16_encoding
 from climx_project.data import daily_forcings, open_full_datasets_local
 from src.data_preprocessing.preprocessing import preprocess_train
@@ -126,18 +126,6 @@ def main():
                 m = json.load(open(manifest_path))
             return {f for files in m.values() for f in files}
 
-        def maybe_upload():
-            def _sz(p):
-                if p.is_dir():
-                    return sum(f.stat().st_size for f in p.rglob("*") if f.is_file())
-                return p.stat().st_size
-            pending = sum(_sz(p) for p in CACHE_DIR.iterdir()
-                          if (p.name.endswith(".zarr") or p.name == "X_test.nc")
-                          and not p.name.startswith(".tmp"))
-            if pending >= 18e9:
-                upload_batches(CACHE_DIR, OWNER, manifest_path,
-                               slug_prefix=slug_prefix)
-
         def download_one(name: str) -> Path:
             from huggingface_hub import hf_hub_download
             dst = Path("/tmp/raw_full") / name
@@ -165,10 +153,9 @@ def main():
                 scaling_params_path=SCALING_JSON, load_into_memory=False,
                 stationarization_mode="none"))
             write_cache_x(X_scaled, CACHE_DIR, [scen], ENCODING,
-                          skip=uploaded_set(), flush=maybe_upload)
+                          skip=uploaded_set())
             write_cache_y(raw.parent, CACHE_DIR, [scen], ENCODING, SCALING_JSON,
-                          skip=uploaded_set(), flush=maybe_upload)
-            upload_batches(CACHE_DIR, OWNER, manifest_path, slug_prefix=slug_prefix)
+                          skip=uploaded_set())
             raw.unlink()
             log.info("deleted %s", raw.name)
 
@@ -198,14 +185,11 @@ def main():
             # Hist window: 1961-1990 lies entirely inside the second hist file.
             hist_raw = download_one(f"{PREFIX}hist_train_1932_2014.nc")
             hist_ds = xr.open_dataset(hist_raw, engine="h5netcdf", chunks=_HIST_CHUNKS)
-            write_hist_window(hist_ds, CACHE_DIR, ENCODING, skip=uploaded_set(),
-                              flush=maybe_upload)
-            upload_batches(CACHE_DIR, OWNER, manifest_path, slug_prefix=slug_prefix)
+            write_hist_window(hist_ds, CACHE_DIR, ENCODING, skip=uploaded_set())
             hist_raw.unlink()
 
-        return {"uploaded_set": uploaded_set, "maybe_upload": maybe_upload,
-                "download_one": download_one, "build_scenario": build_scenario,
-                "build_extras": build_extras}
+        return {"uploaded_set": uploaded_set, "download_one": download_one,
+                "build_scenario": build_scenario, "build_extras": build_extras}
 
     # One worker per scenario, each with its own manifest + dataset prefix.
     # The worker whose list includes ssp126 also builds X_test + the hist
@@ -217,9 +201,9 @@ def main():
         w["build_scenario"](scen)
         if scen == "ssp126":
             w["build_extras"]()
-        manifest = upload_batches(CACHE_DIR, OWNER,
-                                  paths.PROJECT_ROOT / "data" / f"full_cache_manifest_{scen}.json",
-                                  slug_prefix=f"climx-cache-{scen}-b")
+        manifest = upload_cache(CACHE_DIR, OWNER,
+                                paths.PROJECT_ROOT / "data" / f"full_cache_manifest_{scen}.json",
+                                slug_prefix=f"climx-cache-{scen}")
         log.info("CACHE_UPLOAD_OK (%s) — %d dataset(s):", scen, len(manifest))
         for slug, files in manifest.items():
             log.info("  %s: %s", slug, files)
