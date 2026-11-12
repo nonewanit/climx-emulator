@@ -163,6 +163,9 @@ def main():
             ds, preprocessing_path=paths.PREPROCESSING_DIR, version="full",
             scaling_params_path=SCALING_JSON, load_into_memory=False,
             stationarization_mode="none"))
+        # The aerosol split vars inherit float64 from the source (X_test.nc
+        # came out 30.7 GB) — fp16 matches the training cache and shrinks it ~4x.
+        X_test = X_test.astype("float16")
         encoding = {v: {"zlib": False, "_FillValue": None} for v in X_test.data_vars}
         _save_chunked(X_test, X_TEST_NC, encoding=encoding)
     test_raw.unlink()

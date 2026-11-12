@@ -203,8 +203,10 @@ def _upload_one(batch: list[Path], owner: str, manifest_path: Path, manifest: di
     stage.mkdir(parents=True)
     import zipfile
     for p in batch:
-        if p.is_dir():  # zarr stores are dirs; the CLI skips dirs -> zip them
-            zf = zipfile.ZipFile(stage / f"{p.name}.zip", "w",
+        if p.is_dir():  # zarr stores are dirs; the CLI skips dirs. Package
+            # them with a NON-.zip extension: Kaggle auto-extracts .zip files
+            # on upload, which would shred the store into loose chunk files.
+            zf = zipfile.ZipFile(stage / f"{p.name}.zarrpkg", "w",
                                  compression=zipfile.ZIP_STORED)
             for f in sorted(p.rglob("*")):
                 if f.is_file():
@@ -291,14 +293,14 @@ def copy_datasets_to_cache(mount_dirs, cache_dir: Path) -> None:
     import zipfile
     for d in mount_dirs:
         for p in sorted(Path(d).iterdir()):
-            if p.name.endswith(".zarr.zip"):
-                dst = cache_dir / p.name[:-4]
+            if p.name.endswith(".zarrpkg"):
+                dst = cache_dir / p.name[:-8]  # strip ".zarrpkg" -> <name>.zarr
                 if not dst.exists():
-                    log.info("unzip %s", p.name)
+                    log.info("unpack %s", p.name)
                     t0 = time.time()
                     with zipfile.ZipFile(p) as zf:
-                        zf.extractall(cache_dir)
-                    log.info("OK unzip %s (%.1f min)", p.name, (time.time() - t0) / 60)
+                        zf.extractall(dst)
+                    log.info("OK unpack %s (%.1f min)", p.name, (time.time() - t0) / 60)
             elif p.name.endswith(".zarr") or p.name == "X_test.nc":
                 dst = cache_dir / p.name
                 if not dst.exists():

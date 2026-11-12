@@ -159,6 +159,7 @@ def main():
                     scaling_params_path=SCALING_JSON, load_into_memory=False,
                     stationarization_mode=mode))
             metadata_test["stationarization_mode"] = mode
+            X_test = X_test.astype("float16")  # aerosol splits inherit float64
             encoding = {v: {"zlib": False, "_FillValue": None} for v in X_test.data_vars}
             _save_chunked(X_test, X_TEST_NC, encoding=encoding)
         log.info("X_test: %s", dict(X_test.sizes))
