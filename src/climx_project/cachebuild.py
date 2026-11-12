@@ -24,11 +24,13 @@ FULL_PREFIX = "NorESM2-MM_r1i1p1f1_with_forcing_"
 
 
 def write_cache_x(X_scaled, cache_dir: Path, scenarios, encoding: dict,
-                  skip: set | None = None) -> None:
+                  skip: set | None = None, flush=None) -> None:
     """X cache: one compute per (scenario, var); 1D GHGs broadcast to the
     grid; 128-day output chunks. X sources are small (monthly/yearly) so
     this is fast even through the mount. `skip` = keys already uploaded
-    (session-resume via the manifest)."""
+    (session-resume via the manifest). `flush` = optional callback called
+    after each completed variable (uploads pending files in ~18 GB batches
+    so a session kill loses at most one batch)."""
     skip = skip or set()
     plan = [(s, n) for s in scenarios for n in X_scaled.data_vars]
     for i, (scen, name) in enumerate(plan):
@@ -52,11 +54,13 @@ def write_cache_x(X_scaled, cache_dir: Path, scenarios, encoding: dict,
         ds_out.chunk(chunks).to_zarr(tmp, mode="w", encoding={name: encoding})
         tmp.rename(out)
         log.info("OK %s (%.1f min)", key, (time.time() - t0) / 60)
+        if flush:
+            flush()
 
 
 def write_cache_y(full_dir: Path, cache_dir: Path, scenarios,
                   encoding: dict, scaling_json: Path,
-                  skip: set | None = None) -> None:
+                  skip: set | None = None, flush=None) -> None:
     """y cache: SLAB-BASED direct netCDF4 reads (1,000-day contiguous
     hyperslabs — the mount's fast pattern — with ~220 MB transient memory).
     Transforms match the starter exactly: log10(x+eps) for pr/huss, then
@@ -101,11 +105,14 @@ def write_cache_y(full_dir: Path, cache_dir: Path, scenarios,
             tmp, mode="w", encoding={var: encoding})
         tmp.rename(out)
         log.info("OK %s (%.1f min)", key, (time.time() - t0) / 60)
+        if flush:
+            flush()
 
 
 def write_hist_window(hist_ds, cache_dir: Path, encoding: dict,
                       lo: str = "1961-01-01", hi: str = "1990-12-31",
-                      margin_days: int = 10, skip: set | None = None) -> None:
+                      margin_days: int = 10, skip: set | None = None,
+                      flush=None) -> None:
     """fp16 hist targets over the indices' base period (+margin for the
     doy window) — the ONLY hist the evaluate ever reads. ~5-6 GB total."""
     sel = hist_ds.sel(time=slice(lo, hi))
@@ -132,6 +139,8 @@ def write_hist_window(hist_ds, cache_dir: Path, encoding: dict,
         ds_out.chunk({"time": 128, "lat": -1, "lon": -1}).to_zarr(
             tmp, mode="w", encoding={var: encoding})
         tmp.rename(out)
+        if flush:
+            flush()
     log.info("hist window written")
 
 
