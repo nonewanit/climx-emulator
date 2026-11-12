@@ -32,7 +32,7 @@ import xarray as xr
 import climx_project  # noqa: F401
 from climx_project import paths
 from climx_project.cachebuild import (
-    open_hist_from_cache, upload_batches, write_cache_x, write_cache_y,
+    open_hist_from_cache, upload_cache, write_cache_x, write_cache_y,
     write_hist_window)
 from climx_project.cacheio import zarr_fp16_encoding
 from climx_project.data import daily_forcings, open_full_datasets_local
@@ -138,7 +138,7 @@ def main():
     _ = open_hist_from_cache(CACHE_DIR)  # sanity: mergeable
 
     # 4. Upload in batches.
-    manifest = upload_batches(CACHE_DIR, OWNER, MANIFEST)
+    manifest = upload_cache(CACHE_DIR, OWNER, MANIFEST)
     log.info("CACHE_UPLOAD_OK — %d dataset(s):", len(manifest))
     for slug, files in manifest.items():
         log.info("  %s: %s", slug, files)

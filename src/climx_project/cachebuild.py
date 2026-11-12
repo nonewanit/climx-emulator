@@ -135,10 +135,14 @@ def open_hist_from_cache(cache_dir: Path) -> xr.Dataset:
     return ds
 
 
-def upload_batches(cache_dir: Path, owner: str, manifest_path: Path,
-                   batch_gb: float = 18.0) -> dict:
-    """Upload cache files in ~batch_gb batches as private Kaggle datasets.
-    Manifest ({slug: [files]}) persists at manifest_path and is returned."""
+def upload_cache(cache_dir: Path, owner: str, manifest_path: Path) -> dict:
+    """Upload ALL cache files as ONE private Kaggle dataset (climx-cache).
+
+    One dataset keeps the training-side attach step trivial; the compressed
+    cache (~50-70 GB) fits Kaggle's per-dataset allowance (the raw
+    competition dataset is 171 GB). If the platform rejects the size,
+    split into multiple datasets then. Manifest ({slug: [files]}) persists
+    at manifest_path and is returned."""
     manifest = {}
     if manifest_path.exists():
         manifest = json.load(open(manifest_path))
@@ -148,44 +152,33 @@ def upload_batches(cache_dir: Path, owner: str, manifest_path: Path,
                     and p.name not in uploaded
                     and not p.name.startswith(".tmp")],
                    key=lambda p: p.name)
-    batch, batch_size = [], 0.0
-    for p in files:
-        gb = p.stat().st_size / 1e9
-        if batch and batch_size + gb > batch_gb:
-            _upload_one(batch, owner, manifest_path, manifest)
-            batch, batch_size = [], 0.0
-        batch.append(p)
-        batch_size += gb
-    if batch:
-        _upload_one(batch, owner, manifest_path, manifest)
-    return manifest
-
-
-def _upload_one(batch: list[Path], owner: str, manifest_path: Path, manifest: dict) -> None:
-    idx = len(manifest) + 1
-    slug = f"{owner}/climx-cache-b{idx}"
+    if not files:
+        log.info("nothing to upload")
+        return manifest
+    slug = f"{owner}/climx-cache"
     stage = Path("/tmp/upload_stage")
     if stage.exists():
         shutil.rmtree(stage)
     stage.mkdir(parents=True)
-    for p in batch:
+    for p in files:
         shutil.copy2(p, stage / p.name)
-    meta = {"title": f"climx-cache-b{idx}", "id": slug,
+    meta = {"title": "climx-cache", "id": slug,
             "licenses": [{"name": "CC-BY-4.0"}]}
     with open(stage / "dataset-metadata.json", "w") as f:
         json.dump(meta, f, indent=2)
-    gb = sum(p.stat().st_size for p in batch) / 1e9
-    log.info("=== upload batch %d (%s): %.1f GB -> %s ===", idx, [p.name for p in batch], gb, slug)
+    gb = sum(p.stat().st_size for p in files) / 1e9
+    log.info("=== upload %d files (%.1f GB) -> %s ===", len(files), gb, slug)
     t0 = time.time()
     subprocess.run(["kaggle", "datasets", "create", "-p", str(stage), "--private"],
                    check=True)
     log.info("OK upload %s (%.1f min)", slug, (time.time() - t0) / 60)
-    manifest[slug] = [p.name for p in batch]
+    manifest[slug] = [p.name for p in files]
     with open(manifest_path, "w") as f:
         json.dump(manifest, f, indent=2)
-    for p in batch:
+    for p in files:
         p.unlink()
     shutil.rmtree(stage)
+    return manifest
 
 
 def copy_datasets_to_cache(mount_dirs, cache_dir: Path) -> None:
