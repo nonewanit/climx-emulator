@@ -32,8 +32,8 @@ import xarray as xr
 import climx_project  # noqa: F401
 from climx_project import paths
 from climx_project.cachebuild import (
-    copy_raw_to_tmp, open_hist_from_cache, upload_batches,
-    write_cache_x, write_cache_y, write_hist_window)
+    open_hist_from_cache, upload_batches, write_cache_x, write_cache_y,
+    write_hist_window)
 from climx_project.cacheio import zarr_fp16_encoding
 from climx_project.data import daily_forcings, open_full_datasets_local
 from src.data_preprocessing.preprocessing import preprocess_train
@@ -93,17 +93,13 @@ def main():
     log.info("disk:\n%s", subprocess.run(["df", "-h", "/tmp", "/kaggle/working"],
                                          capture_output=True, text=True).stdout)
 
-    # Copy the raw files to /tmp first: the mount does ~26 MB/s on one
-    # sequential pass (cp) but ~1-2 MB/s on library chunk walks. After the
-    # copy, every read is local disk (~1 GB/s) — the y cache drops from
-    # hours to minutes.
-    full_dir = stage("copy raw files to /tmp (sequential)", lambda:
-                     copy_raw_to_tmp(full_dir, Path("/tmp/raw_full")))
-    ds = stage("open local full-res datasets", lambda: open_full_datasets_local(
+    # The mount is used ONLY for lazy metadata opens (tiny reads — fast).
+    # Raw data arrives via hf downloads PER SCENARIO and is deleted after
+    # use: the CPU session's overlay is small (~100-150 GB), so the raw
+    # files and the cache must never coexist at full size.
+    ds = stage("open mount datasets (metadata only)", lambda: open_full_datasets_local(
         full_dir, scenarios=SCENARIOS))
     ds.hist = ds.hist.chunk(_HIST_CHUNKS)
-    ds.train = ds.train.chunk(_CHUNKS)
-    ds.hist = daily_forcings(ds.hist)
 
     # Frozen scaling params (none mode): bundled in the repo.
     if not SCALING_JSON.exists() and BUNDLED_SCALING.exists():
@@ -115,8 +111,43 @@ def main():
 
     ENCODING = zarr_fp16_encoding()
 
-    # 1. Test forcings (once per session — CPU, ~10 min; ships in a batch).
-    ds.test_forcings = ds.test_forcings.sel(time=slice("2081-01-01", "2101-01-01"))
+    def uploaded_set() -> set:
+        m = {}
+        if MANIFEST.exists():
+            m = json.load(open(MANIFEST))
+        return {f for files in m.values() for f in files}
+
+    def maybe_upload():
+        # upload completed files once ~18 GB has accumulated — a session kill
+        # loses at most the un-uploaded remainder (~one batch)
+        pending = sum(p.stat().st_size for p in CACHE_DIR.iterdir()
+                      if (p.name.endswith(".zarr") or p.name == "X_test.nc")
+                      and not p.name.startswith(".tmp"))
+        if pending >= 18e9:
+            upload_batches(CACHE_DIR, OWNER, MANIFEST)
+
+    def download_one(name: str) -> Path:
+        """hf download to /tmp (xet backend, ~60 MB/s measured) — one file
+        at a time so the CPU session's small overlay never holds everything."""
+        from huggingface_hub import hf_hub_download
+        dst = Path("/tmp/raw_full") / name
+        if dst.exists() and dst.stat().st_size > 1e9:
+            return dst
+        t0 = time.time()
+        p = hf_hub_download(repo_id="isp-uv-es/ClimX", repo_type="dataset",
+                            filename=f"full/{name}",
+                            local_dir=str(Path("/tmp/hf_tmp")))
+        shutil.move(p, dst)
+        log.info("OK hf download %s (%.1f min)", name, (time.time() - t0) / 60)
+        return dst
+
+    PREFIX = "NorESM2-MM_r1i1p1f1_with_forcing_"
+
+    # 1. Test forcings (download the small file; local preprocess_test).
+    test_raw = download_one(f"{PREFIX}test_forcings_ssp245.nc")
+    ds.test_forcings = xr.open_dataset(test_raw, engine="h5netcdf",
+                                       chunks=_CHUNKS).sel(
+        time=slice("2081-01-01", "2101-01-01"))
     X_TEST_NC = CACHE_DIR / "X_test.nc"
     if not X_TEST_NC.exists():
         if not CLIMATOLOGY.exists():  # preprocess_test requires the file to exist
@@ -129,22 +160,39 @@ def main():
             stationarization_mode="none"))
         encoding = {v: {"zlib": False, "_FillValue": None} for v in X_test.data_vars}
         _save_chunked(X_test, X_TEST_NC, encoding=encoding)
+    test_raw.unlink()
 
-    # 2. Training cache.
-    ds.train = ds.train.isel(time=slice(0, None, args.subsample))
-    X_scaled, _, _ = stage("pass B: lazy scaled fields", lambda: preprocess_train(
-        ds, preprocessing_path=paths.PREPROCESSING_DIR, version="full",
-        scaling_params_path=SCALING_JSON, load_into_memory=False,
-        stationarization_mode="none"))
-    write_cache_x(X_scaled, CACHE_DIR, SCENARIOS, ENCODING)
-    write_cache_y(full_dir, CACHE_DIR, SCENARIOS, ENCODING, SCALING_JSON)
+    # 2. Per-scenario streaming: download -> build X+y -> upload -> delete.
+    for scen in SCENARIOS:
+        raw = download_one(f"{PREFIX}train_{scen}.nc")
+        one = type("DS", (), {
+            "hist": ds.hist,
+            "train": xr.open_dataset(raw, engine="h5netcdf", chunks=_CHUNKS)
+                      .isel(time=slice(0, None, args.subsample)),
+            "test_forcings": ds.test_forcings,
+        })()
+        X_scaled, _, _ = stage(f"pass B ({scen})", lambda one=one: preprocess_train(
+            one, preprocessing_path=paths.PREPROCESSING_DIR, version="full",
+            scaling_params_path=SCALING_JSON, load_into_memory=False,
+            stationarization_mode="none"))
+        write_cache_x(X_scaled, CACHE_DIR, [scen], ENCODING,
+                      skip=uploaded_set(), flush=maybe_upload)
+        write_cache_y(raw.parent, CACHE_DIR, [scen], ENCODING, SCALING_JSON,
+                      skip=uploaded_set(), flush=maybe_upload)
+        upload_batches(CACHE_DIR, OWNER, MANIFEST)
+        raw.unlink()
+        log.info("deleted %s", raw.name)
 
-    # 3. Hist window (the only hist the indices read).
-    write_hist_window(ds.hist, CACHE_DIR, ENCODING)
-    _ = open_hist_from_cache(CACHE_DIR)  # sanity: mergeable
+    # 3. Hist window — 1961-1990 lies entirely inside the second hist file.
+    hist_raw = download_one(f"{PREFIX}hist_train_1932_2014.nc")
+    hist_ds = xr.open_dataset(hist_raw, engine="h5netcdf", chunks=_HIST_CHUNKS)
+    write_hist_window(hist_ds, CACHE_DIR, ENCODING, skip=uploaded_set(),
+                      flush=maybe_upload)
+    upload_batches(CACHE_DIR, OWNER, MANIFEST)
+    hist_raw.unlink()
 
-    # 4. Upload in batches.
-    manifest = upload_cache(CACHE_DIR, OWNER, MANIFEST)
+    # 4. Remaining files (e.g. X_test.nc) if any.
+    manifest = upload_batches(CACHE_DIR, OWNER, MANIFEST)
     log.info("CACHE_UPLOAD_OK — %d dataset(s):", len(manifest))
     for slug, files in manifest.items():
         log.info("  %s: %s", slug, files)
