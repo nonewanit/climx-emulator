@@ -17,7 +17,14 @@ Every script in this repo must start with `import climx_project`.
 
 import os
 import sys
+import warnings
 from pathlib import Path
+
+# zarr 3 spams this on every to_zarr; it's noise (consolidated metadata is
+# optional), not something we act on.
+warnings.filterwarnings(
+    "ignore",
+    "Consolidated metadata is currently not part in the Zarr format 3")
 
 os.environ.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
 
