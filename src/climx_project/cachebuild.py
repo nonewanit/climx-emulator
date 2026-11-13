@@ -234,7 +234,8 @@ def _dir_size(p: Path) -> float:
 
 def _upload_one(batch: list[Path], owner: str, manifest_path: Path, manifest: dict,
                 slug_prefix: str = "climx-cache-b", numbered: bool = True,
-                extra_pkg_files: list[Path] | None = None) -> None:
+                extra_pkg_files: list[Path] | None = None,
+                versioned: bool = False) -> None:
     idx = len(manifest) + 1
     slug = f"{owner}/{slug_prefix}{idx if numbered else ''}"
     stage = Path("/tmp/upload_stage")
@@ -267,14 +268,20 @@ def _upload_one(batch: list[Path], owner: str, manifest_path: Path, manifest: di
     log.info("=== upload batch %d (%s): %.1f GB -> %s ===",
              idx, [p.name for p in batch], gb, slug)
     t0 = time.time()
-    r = subprocess.run(["kaggle", "datasets", "create", "-p", str(stage)],
-                       capture_output=True, text=True)
+    # create for NEW datasets; version for UPDATING an existing one (create
+    # against an existing slug silently does nothing — observed: 0.1 min
+    # "upload" that left the old files in place).
+    cmd = (["kaggle", "datasets", "version", "-p", str(stage), "-m", "cache rebuild"]
+           if versioned
+           else ["kaggle", "datasets", "create", "-p", str(stage)])
+    r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
         log.error("datasets create failed (exit %d):\nSTDOUT: %s\nSTDERR: %s",
                   r.returncode, r.stdout, r.stderr)
         raise RuntimeError(f"kaggle datasets create failed: {r.stderr or r.stdout}")
     log.info("OK upload %s (%.1f min)", slug, (time.time() - t0) / 60)
-    manifest[slug] = [p.stem if p.suffix == ".zarr" else p.name for p in batch]
+    stems = [p.stem if p.suffix == ".zarr" else p.name for p in batch]
+    manifest[slug] = sorted(set(manifest.get(slug, [])) | set(stems))
     with open(manifest_path, "w") as f:
         json.dump(manifest, f, indent=2)
     for p in batch:
@@ -330,7 +337,8 @@ def copy_raw_to_tmp(full_dir: Path, dest: Path) -> Path:
 
 def upload_cache(cache_dir: Path, owner: str, manifest_path: Path,
                  slug_prefix: str = "climx-cache",
-                 include_pkg_from: Path | None = None) -> dict:
+                 include_pkg_from: Path | None = None,
+                 versioned: bool = False) -> dict:
     """Upload ALL files in cache_dir as ONE private dataset (owner/slug_prefix).
 
     Per-scenario caches are ~60-80 GB compressed — one dataset each is
@@ -354,7 +362,7 @@ def upload_cache(cache_dir: Path, owner: str, manifest_path: Path,
         return manifest
     _upload_one(files, owner, manifest_path, manifest,
                 slug_prefix=slug_prefix, numbered=False,
-                extra_pkg_files=pkg_files)
+                extra_pkg_files=pkg_files, versioned=versioned)
     return json.load(open(manifest_path))
 
 

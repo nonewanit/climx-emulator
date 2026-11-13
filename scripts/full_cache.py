@@ -209,7 +209,8 @@ def main():
         upload_cache(CACHE_DIR, OWNER,
                      paths.PROJECT_ROOT / "data" / f"full_cache_manifest_{scen}.json",
                      slug_prefix=f"climx-cache-{scen}",
-                     include_pkg_from=recover_dir)
+                     include_pkg_from=recover_dir,
+                     versioned=recover_dir is not None)
         if scen == "ssp126":
             w["build_extras"]()
             # Extras upload to their OWN dataset: re-creating the scenario
