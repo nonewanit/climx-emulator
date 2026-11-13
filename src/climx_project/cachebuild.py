@@ -365,9 +365,15 @@ def copy_datasets_to_cache(mount_dirs, cache_dir: Path) -> None:
                     log.info("unpack %s", p.name)
                     t0 = time.time()
                     with zipfile.ZipFile(p) as zf:
-                        log.info("zip contents (first 15): %s",
-                                 zf.namelist()[:15])
                         zf.extractall(dst)
+                    # REPAIR: the chunked writers omit the ROOT group metadata
+                    # (the per-array zarr.json files are complete) — add the
+                    # minimal zarr v3 root so open_zarr finds the group.
+                    if not (dst / "zarr.json").exists() and not (dst / ".zgroup").exists():
+                        (dst / "zarr.json").write_text(json.dumps(
+                            {"zarr_format": 3, "node_type": "group",
+                             "attributes": {}}))
+                        log.info("repaired missing root zarr.json for %s", p.name)
                     log.info("OK unpack %s (%.1f min)", p.name, (time.time() - t0) / 60)
             elif p.name.endswith(".zarr") or p.name == "X_test.nc":
                 dst = cache_dir / p.name
