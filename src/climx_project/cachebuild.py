@@ -362,8 +362,10 @@ def upload_cache(cache_dir: Path, owner: str, manifest_path: Path,
                     and not p.name.startswith(".tmp")],
                    key=lambda p: p.name)
     pkg_files = sorted(include_pkg_from.glob("X_*.zarrpkg")) if include_pkg_from else []
-    if not files and not pkg_files:
-        log.info("nothing to upload")
+    if not files:
+        # nothing NEW to upload — skip even when a recover dir is present
+        # (re-uploading a complete dataset as a redundant version is waste).
+        log.info("nothing new to upload")
         return manifest
     _upload_one(files, owner, manifest_path, manifest,
                 slug_prefix=slug_prefix, numbered=False,
