@@ -206,6 +206,12 @@ def main():
                      slug_prefix=f"climx-cache-{scen}")
         if scen == "ssp126":
             w["build_extras"]()
+            # Extras upload to their OWN dataset: re-creating the scenario
+            # slug silently drops the new files (and the code then deleted
+            # them from /tmp — they must be rebuilt once).
+            upload_cache(CACHE_DIR, OWNER,
+                         paths.PROJECT_ROOT / "data" / "full_cache_manifest_extras.json",
+                         slug_prefix="climx-cache-extras")
         manifest = upload_cache(CACHE_DIR, OWNER,
                                 paths.PROJECT_ROOT / "data" / f"full_cache_manifest_{scen}.json",
                                 slug_prefix=f"climx-cache-{scen}")
