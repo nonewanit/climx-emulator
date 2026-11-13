@@ -73,10 +73,10 @@ def write_cache_y(full_dir: Path, cache_dir: Path, scenarios,
     import gc
     gc.collect()  # the X phase's full-var allocations leave a swollen heap
     sc = json.load(open(scaling_json))["scaling_params"]
-    # SLAB must be a multiple of `step`: the stride inside each slab must
-    # keep the same day-phase as the global subsample, or the per-slab kept
-    # days drift off the time coordinate.
-    SLAB = 252  # ~55 MB per read — RAM-safe even on the smallest CPU sessions
+    # SLAB must be a multiple of BOTH `step` (stride phase alignment) and
+    # the 128-day zarr chunk grid (xarray rejects appends whose dask chunks
+    # overlap multiple zarr chunks). 384 = lcm(3, 128) covers steps 1 and 3.
+    SLAB = 384  # ~85 MB per read — RAM-safe even on the smallest CPU sessions
     skip = skip or set()
     plan = [(s, v) for s in scenarios for v in TARGETS]
     for i, (scen, var) in enumerate(plan):
