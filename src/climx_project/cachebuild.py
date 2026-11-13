@@ -63,7 +63,7 @@ def write_cache_x(X_scaled, cache_dir: Path, scenarios, encoding: dict,
 
 def write_cache_y(full_dir: Path, cache_dir: Path, scenarios,
                   encoding: dict, scaling_json: Path,
-                  skip: set | None = None, flush=None) -> None:
+                  skip: set | None = None, flush=None, step: int = 1) -> None:
     """y cache: SLAB-BASED direct netCDF4 reads (1,000-day contiguous
     hyperslabs — the mount's fast pattern — with ~220 MB transient memory).
     Transforms match the starter exactly: log10(x+eps) for pr/huss, then
@@ -73,9 +73,9 @@ def write_cache_y(full_dir: Path, cache_dir: Path, scenarios,
     import gc
     gc.collect()  # the X phase's full-var allocations leave a swollen heap
     sc = json.load(open(scaling_json))["scaling_params"]
-    # MULTIPLE OF 3: the [::3] stride inside each slab must keep the same
-    # day-phase as the global subsample, or the per-slab kept days drift off
-    # the time coordinate (CoordinateValidationError on the last slabs).
+    # SLAB must be a multiple of `step`: the stride inside each slab must
+    # keep the same day-phase as the global subsample, or the per-slab kept
+    # days drift off the time coordinate.
     SLAB = 252  # ~55 MB per read — RAM-safe even on the smallest CPU sessions
     skip = skip or set()
     plan = [(s, v) for s in scenarios for v in TARGETS]
@@ -95,7 +95,7 @@ def write_cache_y(full_dir: Path, cache_dir: Path, scenarios,
         # never hold the full variable in memory (~0.5 GB peak per slab).
         with NCDataset(str(full_dir / f"{FULL_PREFIX}train_{scen}.nc")) as nc:
             n = len(nc["time"])
-            time_c = nc["time"][::3]
+            time_c = nc["time"][::step]
             lat = nc["lat"][:]
             lon = nc["lon"][:]
             # The vars are 4D (forcing_scenario, time, lat, lon): the slab
@@ -112,7 +112,7 @@ def write_cache_y(full_dir: Path, cache_dir: Path, scenarios,
                 slab_arr = nc[var][tuple(idx_slice)]
                 if len(slab_arr.shape) == 4 and slab_arr.shape[0] == 1:
                     slab_arr = slab_arr[0]  # squeeze the scenario dim
-                s = slab_arr[::3].astype(np.float32)
+                s = slab_arr[::step].astype(np.float32)
                 del slab_arr
                 if var in ("pr", "huss"):
                     s = np.log10(s + 1e-6)
@@ -233,7 +233,8 @@ def _dir_size(p: Path) -> float:
 
 
 def _upload_one(batch: list[Path], owner: str, manifest_path: Path, manifest: dict,
-                slug_prefix: str = "climx-cache-b", numbered: bool = True) -> None:
+                slug_prefix: str = "climx-cache-b", numbered: bool = True,
+                extra_pkg_files: list[Path] | None = None) -> None:
     idx = len(manifest) + 1
     slug = f"{owner}/{slug_prefix}{idx if numbered else ''}"
     stage = Path("/tmp/upload_stage")
@@ -253,6 +254,8 @@ def _upload_one(batch: list[Path], owner: str, manifest_path: Path, manifest: di
             zf.close()
         else:
             shutil.copy2(p, stage / p.name)
+    for p in (extra_pkg_files or []):
+        shutil.copy2(p, stage / p.name)
     # CLI v2.2.5: metadata file is dataset-metadata.json (SINGULAR — verified
     # against the CLI's own error message); private is the default (there is
     # no --private flag).
@@ -326,12 +329,16 @@ def copy_raw_to_tmp(full_dir: Path, dest: Path) -> Path:
 
 
 def upload_cache(cache_dir: Path, owner: str, manifest_path: Path,
-                 slug_prefix: str = "climx-cache") -> dict:
+                 slug_prefix: str = "climx-cache",
+                 include_pkg_from: Path | None = None) -> dict:
     """Upload ALL files in cache_dir as ONE private dataset (owner/slug_prefix).
 
     Per-scenario caches are ~60-80 GB compressed — one dataset each is
     clean and under the per-dataset allowance; the worker build (~3-4 h)
-    fits the 9 h session cap, so end-of-build upload is fine."""
+    fits the 9 h session cap, so end-of-build upload is fine.
+    include_pkg_from: a dir whose .zarrpkg files are copied into the stage
+    as-is (used by the y-rebuild recovery to re-upload the X packages with
+    the corrected y packages as a new dataset version)."""
     manifest = {}
     if manifest_path.exists():
         manifest = json.load(open(manifest_path))
@@ -341,11 +348,13 @@ def upload_cache(cache_dir: Path, owner: str, manifest_path: Path,
                     and (p.stem if p.suffix == ".zarr" else p.name) not in uploaded
                     and not p.name.startswith(".tmp")],
                    key=lambda p: p.name)
-    if not files:
+    pkg_files = sorted(include_pkg_from.glob("X_*.zarrpkg")) if include_pkg_from else []
+    if not files and not pkg_files:
         log.info("nothing to upload")
         return manifest
     _upload_one(files, owner, manifest_path, manifest,
-                slug_prefix=slug_prefix, numbered=False)
+                slug_prefix=slug_prefix, numbered=False,
+                extra_pkg_files=pkg_files)
     return json.load(open(manifest_path))
 
 

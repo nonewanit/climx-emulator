@@ -155,7 +155,7 @@ def main():
             write_cache_x(X_scaled, CACHE_DIR, [scen], ENCODING,
                           skip=uploaded_set())
             write_cache_y(raw.parent, CACHE_DIR, [scen], ENCODING, SCALING_JSON,
-                          skip=uploaded_set())
+                          skip=uploaded_set(), step=args.subsample)
             raw.unlink()
             log.info("deleted %s", raw.name)
 
@@ -201,9 +201,15 @@ def main():
         w["build_scenario"](scen)
         # Upload BEFORE the extras: the scenario cache is ~60-70 GB and the
         # hist download (~32 GB) would otherwise tip the small overlay over.
+        # RECOVERY mode (CLIMX_RECOVER_PKG_DIR): also stage the EXISTING
+        # X_*.zarrpkg files from the attached dataset so the new version
+        # contains the complete corrected set.
+        recover_dir = Path(os.environ["CLIMX_RECOVER_PKG_DIR"]) \
+            if os.environ.get("CLIMX_RECOVER_PKG_DIR") else None
         upload_cache(CACHE_DIR, OWNER,
                      paths.PROJECT_ROOT / "data" / f"full_cache_manifest_{scen}.json",
-                     slug_prefix=f"climx-cache-{scen}")
+                     slug_prefix=f"climx-cache-{scen}",
+                     include_pkg_from=recover_dir)
         if scen == "ssp126":
             w["build_extras"]()
             # Extras upload to their OWN dataset: re-creating the scenario
