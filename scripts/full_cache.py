@@ -177,7 +177,7 @@ def main():
                                        version="full", scaling_params_path=SCALING_JSON,
                                        load_into_memory=False,
                                        stationarization_mode="none"))
-                X_test = X_test.astype("float16")  # aerosol splits inherit float64
+                X_test = X_test.astype("float32")  # netCDF4 has no float16; f4 still halves the float64 bloat
                 encoding = {v: {"zlib": False, "_FillValue": None}
                             for v in X_test.data_vars}
                 _save_chunked(X_test, X_TEST_NC, encoding=encoding)
