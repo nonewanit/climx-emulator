@@ -68,7 +68,7 @@ def write_cache_y(full_dir: Path, cache_dir: Path, scenarios,
     from netCDF4 import Dataset as NCDataset
 
     sc = json.load(open(scaling_json))["scaling_params"]
-    SLAB = 1000
+    SLAB = 250  # ~55 MB per read — RAM-safe even on the smallest CPU sessions
     skip = skip or set()
     plan = [(s, v) for s in scenarios for v in TARGETS]
     for i, (scen, var) in enumerate(plan):
