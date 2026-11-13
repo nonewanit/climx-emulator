@@ -124,7 +124,21 @@ def main():
             m = {}
             if manifest_path.exists():
                 m = json.load(open(manifest_path))
-            return {f for files in m.values() for f in files}
+            stems = {f for files in m.values() for f in files}
+            # ALSO consult the attached dataset mounts: any .zarrpkg already
+            # in a dataset is by definition uploaded. This keeps the skip
+            # working even when a fresh notebook copy lost the local manifest
+            # (observed: X rebuilt despite being in the dataset).
+            for env in ("CLIMX_RECOVER_PKG_DIR", "CLIMX_RECOVER_EXTRAS_DIR"):
+                d = os.environ.get(env)
+                if not d:
+                    continue
+                for q in Path(d).iterdir():
+                    if q.name.endswith(".zarrpkg"):
+                        stems.add(q.name[:-8].rsplit(".zarr", 1)[0])
+                    elif q.name == "X_test.nc":
+                        stems.add(q.name)
+            return stems
 
         def download_one(name: str) -> Path:
             from huggingface_hub import hf_hub_download
