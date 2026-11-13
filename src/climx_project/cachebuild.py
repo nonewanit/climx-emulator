@@ -365,6 +365,8 @@ def copy_datasets_to_cache(mount_dirs, cache_dir: Path) -> None:
                     log.info("unpack %s", p.name)
                     t0 = time.time()
                     with zipfile.ZipFile(p) as zf:
+                        log.info("zip contents (first 15): %s",
+                                 zf.namelist()[:15])
                         zf.extractall(dst)
                     log.info("OK unpack %s (%.1f min)", p.name, (time.time() - t0) / 60)
             elif p.name.endswith(".zarr") or p.name == "X_test.nc":
