@@ -199,6 +199,11 @@ def main():
         w = worker(paths.PROJECT_ROOT / "data" / f"full_cache_manifest_{scen}.json",
                    f"climx-cache-{scen}-b")
         w["build_scenario"](scen)
+        # Upload BEFORE the extras: the scenario cache is ~60-70 GB and the
+        # hist download (~32 GB) would otherwise tip the small overlay over.
+        upload_cache(CACHE_DIR, OWNER,
+                     paths.PROJECT_ROOT / "data" / f"full_cache_manifest_{scen}.json",
+                     slug_prefix=f"climx-cache-{scen}")
         if scen == "ssp126":
             w["build_extras"]()
         manifest = upload_cache(CACHE_DIR, OWNER,
