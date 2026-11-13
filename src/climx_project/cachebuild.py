@@ -73,7 +73,10 @@ def write_cache_y(full_dir: Path, cache_dir: Path, scenarios,
     import gc
     gc.collect()  # the X phase's full-var allocations leave a swollen heap
     sc = json.load(open(scaling_json))["scaling_params"]
-    SLAB = 250  # ~55 MB per read — RAM-safe even on the smallest CPU sessions
+    # MULTIPLE OF 3: the [::3] stride inside each slab must keep the same
+    # day-phase as the global subsample, or the per-slab kept days drift off
+    # the time coordinate (CoordinateValidationError on the last slabs).
+    SLAB = 252  # ~55 MB per read — RAM-safe even on the smallest CPU sessions
     skip = skip or set()
     plan = [(s, v) for s in scenarios for v in TARGETS]
     for i, (scen, var) in enumerate(plan):
