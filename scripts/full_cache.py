@@ -216,9 +216,13 @@ def main():
             # Extras upload to their OWN dataset: re-creating the scenario
             # slug silently drops the new files (and the code then deleted
             # them from /tmp — they must be rebuilt once).
+            extras_dir = Path(os.environ["CLIMX_RECOVER_EXTRAS_DIR"]) \
+                if os.environ.get("CLIMX_RECOVER_EXTRAS_DIR") else None
             upload_cache(CACHE_DIR, OWNER,
                          paths.PROJECT_ROOT / "data" / "full_cache_manifest_extras.json",
-                         slug_prefix="climx-cache-extras")
+                         slug_prefix="climx-cache-extras",
+                         include_pkg_from=extras_dir,
+                         versioned=extras_dir is not None)
         manifest = upload_cache(CACHE_DIR, OWNER,
                                 paths.PROJECT_ROOT / "data" / f"full_cache_manifest_{scen}.json",
                                 slug_prefix=f"climx-cache-{scen}")
