@@ -168,6 +168,11 @@ def write_hist_window(hist_ds, cache_dir: Path, encoding: dict,
         da.astype("float16").chunk({"time": 128, "lat": -1, "lon": -1}).to_zarr(
             tmp, mode="w", encoding={var: encoding})
         tmp.rename(out)
+        gb = _dir_size(out) / 1e9
+        log.info("OK hist %s (%.3f GB)", var, gb)
+        if gb < 0.05:  # ~11k days of fp16 can't compress below ~50 MB
+            log.error("hist %s store suspiciously small (%.3f GB) — REBUILD needed",
+                      var, gb)
         if flush:
             flush()
     log.info("hist window written")
