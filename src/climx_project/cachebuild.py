@@ -95,10 +95,22 @@ def write_cache_y(full_dir: Path, cache_dir: Path, scenarios,
             time_c = nc["time"][::3]
             lat = nc["lat"][:]
             lon = nc["lon"][:]
+            # The vars are 4D (forcing_scenario, time, lat, lon): the slab
+            # must slice the TIME axis, not axis 0. (Every previous y OOM was
+            # this bug — [s0:s0+SLAB] sliced the scenario axis and pulled the
+            # entire 6.9 GB variable per "slab".)
+            var_dims = list(nc[var].dimensions)
+            t_axis = var_dims.index("time")
             first = True
             idx = 0
             for s0 in range(0, n, SLAB):
-                s = nc[var][s0:s0 + SLAB][::3].astype(np.float32)
+                idx_slice = [slice(None)] * len(var_dims)
+                idx_slice[t_axis] = slice(s0, s0 + SLAB)
+                slab_arr = nc[var][tuple(idx_slice)]
+                if len(slab_arr.shape) == 4 and slab_arr.shape[0] == 1:
+                    slab_arr = slab_arr[0]  # squeeze the scenario dim
+                s = slab_arr[::3].astype(np.float32)
+                del slab_arr
                 if var in ("pr", "huss"):
                     s = np.log10(s + 1e-6)
                 s = (s - sc[var]["mean"]) / sc[var]["std"]
