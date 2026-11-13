@@ -179,7 +179,12 @@ class _CacheDataset(Dataset):
             # each store holds one variable: the array named in the file stem
             ds = xr.open_zarr(p).isel(time=tsel)
             name = list(ds.data_vars)[0]
-            return ds[name].values.astype(np.float32)
+            arr = ds[name].values.astype(np.float32)
+            if arr.shape[0] == 0:
+                raise RuntimeError(
+                    f"{p.name}: empty read at time {tsel}; opened sizes "
+                    f"{dict(ds.sizes)}")
+            return arr
 
         xs = [read_var(p) for p in self.x_paths[scen]]
         ys = [read_var(p) for p in self.y_paths[scen]]
@@ -352,10 +357,14 @@ class UNetEmulator(Emulator):
         logger.info("cache dataset: train %d (step %d), val %d",
                     len(train_ds), step, len(val_ds))
 
+        # num_workers=0: zarr v3 runs an internal asyncio loop; forked
+        # DataLoader workers from a process that already opened zarr stores
+        # produced empty reads (observed). The block reads are local-disk
+        # and cheap, so single-process loading is fine.
         train_dl = DataLoader(train_ds, batch_size=int(tp.get("batch_size", 64)),
-                              shuffle=True, num_workers=int(tp.get("num_workers", 0)))
+                              shuffle=True, num_workers=0)
         val_dl = DataLoader(val_ds, batch_size=int(tp.get("batch_size", 64)),
-                            shuffle=False, num_workers=int(tp.get("num_workers", 0)))
+                            shuffle=False, num_workers=0)
         self._train(train_dl, val_dl, tp)
 
     def predict(self, X, *, target_vars=None, time_chunk=512):
