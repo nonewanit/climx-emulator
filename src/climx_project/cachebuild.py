@@ -179,7 +179,13 @@ def open_hist_from_cache(cache_dir: Path) -> xr.Dataset:
     for var in TARGETS:
         p = cache_dir / f"hist_{var}.zarr"
         if p.exists():
-            ds[var] = xr.open_zarr(p)[var]
+            try:
+                ds[var] = xr.open_zarr(p)[var]
+            except Exception as e:
+                log.error("open %s failed: %s", p, e)
+                log.error("store contents (first 30): %s",
+                          sorted(str(f.relative_to(p)) for f in p.rglob("*"))[:30])
+                raise
     if not ds.data_vars:
         raise FileNotFoundError(f"no hist_*.zarr under {cache_dir}")
     return ds
@@ -352,7 +358,10 @@ def copy_datasets_to_cache(mount_dirs, cache_dir: Path) -> None:
         for p in sorted(Path(d).iterdir()):
             if p.name.endswith(".zarrpkg"):
                 dst = cache_dir / p.name[:-8]  # strip ".zarrpkg" -> <name>.zarr
-                if not dst.exists():
+                has_root = (dst / "zarr.json").exists() or (dst / ".zgroup").exists()
+                if not has_root:
+                    if dst.exists():
+                        shutil.rmtree(dst)
                     log.info("unpack %s", p.name)
                     t0 = time.time()
                     with zipfile.ZipFile(p) as zf:
