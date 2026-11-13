@@ -48,10 +48,13 @@ def write_cache_x(X_scaled, cache_dir: Path, scenarios, encoding: dict,
         da = X_scaled.sel(forcing_scenario=scen)[name]
         if "lat" not in da.dims:
             da = da.expand_dims(lat=X_scaled.lat, lon=X_scaled.lon).transpose("time", "lat", "lon")
-        arr = da.compute().values.astype("float16")
-        ds_out = xr.Dataset({name: (da.dims, arr)}, coords=da.coords)
-        chunks = {d: (128 if d == "time" else -1) for d in da.dims}
-        ds_out.chunk(chunks).to_zarr(tmp, mode="w", encoding={name: encoding})
+        # CHUNKED write (no full-array materialization): at x1 a full var is
+        # 6.9 GB fp32 — the compute-then-write peaked ~10 GB per variable and
+        # left the heap at the RAM limit, so even tiny later allocations OOM'd
+        # the CPU session. The train file is LOCAL now; chunk-walk is fast.
+        da.astype("float16").chunk(
+            {d: (128 if d == "time" else -1) for d in da.dims}
+        ).to_zarr(tmp, mode="w", encoding={name: encoding})
         tmp.rename(out)
         log.info("OK %s (%.1f min)", key, (time.time() - t0) / 60)
         if flush:
@@ -67,6 +70,8 @@ def write_cache_y(full_dir: Path, cache_dir: Path, scenarios,
     z-score with the frozen params."""
     from netCDF4 import Dataset as NCDataset
 
+    import gc
+    gc.collect()  # the X phase's full-var allocations leave a swollen heap
     sc = json.load(open(scaling_json))["scaling_params"]
     SLAB = 250  # ~55 MB per read — RAM-safe even on the smallest CPU sessions
     skip = skip or set()
