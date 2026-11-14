@@ -415,7 +415,7 @@ class UNetEmulator(Emulator):
                             shuffle=False, num_workers=0)
         self._train(train_dl, val_dl, tp)
 
-    def predict(self, X, *, target_vars=None, time_chunk=512):
+    def predict(self, X, *, target_vars=None, time_chunk=256):
         self.model.eval()
         if target_vars is not None:
             self.target_vars = target_vars

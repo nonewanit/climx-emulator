@@ -226,6 +226,11 @@ def main():
             model_path="/tmp/full_unet_models",
             logger=False)))
     emulator.save("/tmp/full_unet.pt")
+    # Free the training-side memory before the evaluate: predict accumulates
+    # ~12 GB of predictions, the reversal copies it, and the 512/256-day
+    # input chunks add ~1-2.5 GB on top — the session died here before.
+    import gc
+    gc.collect()
 
     # ---------- evaluate (two passes; RAM-safe) ----------
     PRED_PATH = Path("/tmp/full_unet_predictions.zarr")
