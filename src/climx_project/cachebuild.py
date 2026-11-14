@@ -388,6 +388,11 @@ def copy_datasets_to_cache(mount_dirs, cache_dir: Path) -> None:
     mount's ~26 MB/s — the only mount I/O training pays). Zarr stores
     arrive as <name>.zarr.zip (the upload zipped the dirs); unzip them."""
     import zipfile
+    total_pkg = sum(p.stat().st_size for d in mount_dirs
+                    for p in Path(d).iterdir()
+                    if p.name.endswith(".zarrpkg") or p.name == "X_test.nc")
+    df = subprocess.run(["df", "-h", "/tmp"], capture_output=True, text=True).stdout
+    log.info("copy start: %.1f GB to unpack; %s", total_pkg / 1e9, df.strip().splitlines()[-1])
     for d in mount_dirs:
         for p in sorted(Path(d).iterdir()):
             if p.name.endswith(".zarrpkg"):
