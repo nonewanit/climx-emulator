@@ -109,6 +109,29 @@ def _patch_compute_scaling_params() -> None:
     logger.info("Applied single-pass compute_scaling_params patch")
 
 
+def _patch_precip_fp16_upcast() -> None:
+    """Upcast fp16 pr to fp32 before the mm/day conversion.
+
+    `_precip_da_mm_day` computes `da * 86400` with an INT scalar. Under
+    NumPy 2's promotion rules the scalar itself is cast to the array dtype:
+    for a fp16 store (full-res predictions) 86400 -> inf BEFORE the
+    multiply, so every pr cell becomes inf in mm/day and the sum-based
+    indices (Rx5day, SDII) fail the submission's finite check. The lite
+    flow (fp32/fp64) never hit this. Other dtypes are left untouched.
+    """
+    import src.indices_xclim as I
+
+    original = I._precip_da_mm_day
+
+    def patched(da):
+        if da.dtype == np.float16:
+            da = da.astype(np.float32)
+        return original(da)
+
+    I._precip_da_mm_day = patched
+    logger.info("Applied fp16 precip mm/day upcast patch")
+
+
 def _patch_hist_indices() -> None:
     """Replace the hist-dependent indices (WSDI/CSDI/R95p) with the numpy
     streaming versions from indices_numpy.
@@ -138,5 +161,6 @@ def apply() -> None:
     _xr_dt._strftime_through_series = _strftime_through_series
     _patch_stationarize_reverse()
     _patch_compute_scaling_params()
+    _patch_precip_fp16_upcast()
     _patch_hist_indices()
     logger.info("Applied xarray strftime/ArrowStringArray compatibility patch")

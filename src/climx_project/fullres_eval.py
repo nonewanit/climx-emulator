@@ -26,10 +26,14 @@ AEROSOLS = ["BC_AX", "BC_N", "SO2", "SO4_PR", "OM_NI"]
 GHG = ["CO2_LBC", "N2O_LBC", "CH4_LBC", "CFC11eq_LBC", "CF2CL2_LBC"]
 
 
-# Bumped after the fp16-clip + fp32-psl reversal fix: stores reversed by the
-# OLD code contain infs (pr's 10^12 log-cap and psl's ~1e5 Pa overflowed the
-# fp16 cast) and must be recomputed. Stores carry this marker as a sidecar.
-REVERSAL_VERSION = "2"
+# v2: fp16 clip + fp32 psl (old stores contain infs from the overflow casts).
+# v3: log cap 12 -> -3. Two downstream fp16 hazards made v2 stores fail the
+# finite check: (1) xclim's `pr * 86400` mm/day conversion casts the INT
+# scalar to fp16 first — 86400 itself overflows to inf, so every pr cell
+# went inf (fixed separately in compat via a fp32 upcast); (2) pathological
+# cells clipped to 65504 would still overflow the rolling/annual sums. The
+# -3 cap (86.4 mm/day) keeps every downstream fp16 op finite on its own.
+REVERSAL_VERSION = "3"
 
 
 def _reversal_marker(pred_path: Path) -> Path:
@@ -170,13 +174,20 @@ def evaluate_pass1(emulator, raw_test: Path, metadata, pred_path: Path,
             t1 = min(n, t0 + 128)
             vals = a[t0:t1].astype(np.float32) * sc[var]["std"] + sc[var]["mean"]
             if var in log_info:
-                vals = np.minimum(vals, 12)
+                # Log cap at -3 -> 0.001 kg m-2 s-1 = 86.4 mm/day — beyond
+                # any real daily precipitation. The starter's cap of 12
+                # (10^12) was written for fp32/64 output: in a fp16 store
+                # the value itself overflows, AND even a finite 65504-clip
+                # then overflows xclim's fp16 arithmetic (x86400 mm/day
+                # conversion, 5-day rolling sums, annual SDII accumulations)
+                # -> inf again. With the -3 cap the worst-case annual
+                # accumulation is 365*86.4 = 31,536 < 65,504, so every
+                # downstream fp16 op stays finite.
+                vals = np.minimum(vals, -3.0)
                 vals = (10 ** vals) - log_info[var]["epsilon"]
-            # Guard the fp16 stores: the log cap above means pr can reach
-            # 10^12 mm/day in pathological cells — casting to fp16 overflows
-            # to inf (RuntimeWarning), and infs poison the indices computed
-            # from this store. Clip to the fp16 range; such cells are absurd
-            # model outputs either way. psl's fp32 store skips the clip.
+            # Final safety net for the fp16 stores (never binds for the
+            # capped log vars; catches any other extreme channel). psl's
+            # fp32 store skips it.
             if a.dtype == np.dtype("float16"):
                 np.clip(vals, -65504.0, 65504.0, out=vals)
             a[t0:t1] = vals.astype(a.dtype)
