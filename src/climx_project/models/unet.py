@@ -135,6 +135,35 @@ class _ArrayDataset(Dataset):
                 torch.from_numpy(self.y[i]))
 
 
+class _BlockSampler(torch.utils.data.Sampler):
+    """Block-local sampling: shuffle the ORDER of 128-day blocks each epoch
+    and serve the samples within each block together. A random batch of 16
+    samples otherwise touches ~16 different blocks (~1.5 s each of zarr
+    decompress+read) — block-local batches touch exactly one, so the loader
+    stops dominating the training loop."""
+
+    def __init__(self, samples, block_days: int):
+        self.samples = samples
+        self.block_days = block_days
+        self._epoch = 0
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __iter__(self):
+        from collections import defaultdict
+        rng = np.random.default_rng(42 + self._epoch)
+        self._epoch += 1
+        blocks = defaultdict(list)
+        for i, (scen, t) in enumerate(self.samples):
+            blocks[(scen, t // self.block_days)].append(i)
+        idxs = []
+        for b in rng.permutation(list(blocks.keys())):
+            rng.shuffle(blocks[tuple(b)])
+            idxs.extend(blocks[tuple(b)])
+        return iter(idxs)
+
+
 class _CacheDataset(Dataset):
     """Map-style dataset over the fp16 scenario-pure cache (scripts/full_cache.py).
 
@@ -363,12 +392,12 @@ class UNetEmulator(Emulator):
         logger.info("cache dataset: train %d (step %d), val %d",
                     len(train_ds), step, len(val_ds))
 
-        # num_workers=0: zarr v3 runs an internal asyncio loop; forked
-        # DataLoader workers from a process that already opened zarr stores
-        # produced empty reads (observed). The block reads are local-disk
-        # and cheap, so single-process loading is fine.
+        # num_workers=0 + block-local sampler: batches are served from ONE
+        # 128-day block each (one zarr chunk read per store per batch),
+        # which keeps the loader out of the training loop's way.
         train_dl = DataLoader(train_ds, batch_size=int(tp.get("batch_size", 64)),
-                              shuffle=True, num_workers=0)
+                              sampler=_BlockSampler(train_ds.samples, block_days),
+                              num_workers=0)
         val_dl = DataLoader(val_ds, batch_size=int(tp.get("batch_size", 64)),
                             shuffle=False, num_workers=0)
         self._train(train_dl, val_dl, tp)
