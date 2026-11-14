@@ -401,7 +401,8 @@ def copy_datasets_to_cache(mount_dirs, cache_dir: Path,
             return True
         if only_scenarios is None:
             return True
-        return any(f"_{sc}_" in p.name for sc in only_scenarios)
+        # package names are <var>_<scen>.zarr.zarrpkg — match '_<scen>.zarr'
+        return any(f"_{sc}.zarr" in p.name for sc in only_scenarios)
     total_pkg = sum(p.stat().st_size for d in mount_dirs
                     for p in Path(d).iterdir() if _wanted(p))
     df = subprocess.run(["df", "-h", "/tmp"], capture_output=True, text=True).stdout
