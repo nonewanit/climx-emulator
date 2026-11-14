@@ -91,6 +91,9 @@ def main():
                     help="comma-separated scenarios to train on (the session "
                          "storage quota ~57.6 GiB can't hold the full x1 cache "
                          "- one scenario ~24 GB + hist ~11 GB fits)")
+    ap.add_argument("--load-model", default=None,
+                    help="path to a saved full_unet.pt — skip the fit and "
+                         "evaluate with this model")
     ap.add_argument("--max-days", type=int, default=0,
                     help=">0 = smoke: truncate training days per scenario")
     args = ap.parse_args()
@@ -212,25 +215,36 @@ def main():
         hist = ds.hist
 
     # ---------- fit (shared) ----------
-    set_seed(42)
-    emulator = UNetEmulator(dict(
-        n_in=22, n_out=7, base_channels=args.base_channels,
-        learning_rate=args.learning_rate,
-        variable_weights=[1.0, 1.5, 0.5, 0.5, 1.5, 1.5, 1.5],
-        pad_to=[192, 288], skip_connections=bool(args.skip_connections)))
-    stage("fit (cache, 192x288)", lambda: emulator.fit(
-        CACHE_DIR, None, trainer_params=dict(
-            max_epochs=args.epochs, batch_size=args.batch, num_workers=2,
-            sample_step=1, scenarios=train_scenarios, max_days=args.max_days,
-            accelerator="auto", devices=1,
-            model_path="/tmp/full_unet_models",
-            logger=False)))
-    emulator.save("/tmp/full_unet.pt")
-    # Free the training-side memory before the evaluate: predict accumulates
-    # ~12 GB of predictions, the reversal copies it, and the 512/256-day
-    # input chunks add ~1-2.5 GB on top — the session died here before.
-    import gc
+    if args.load_model:
+        emulator = UNetEmulator(dict(
+            n_in=22, n_out=7, base_channels=args.base_channels,
+            learning_rate=args.learning_rate,
+            variable_weights=[1.0, 1.5, 0.5, 0.5, 1.5, 1.5, 1.5],
+            pad_to=[192, 288], skip_connections=bool(args.skip_connections)))
+        stage("load model", lambda: emulator.load(args.load_model))
+        log.info("fit SKIPPED — evaluating %s", args.load_model)
+    else:
+        set_seed(42)
+        emulator = UNetEmulator(dict(
+            n_in=22, n_out=7, base_channels=args.base_channels,
+            learning_rate=args.learning_rate,
+            variable_weights=[1.0, 1.5, 0.5, 0.5, 1.5, 1.5, 1.5],
+            pad_to=[192, 288], skip_connections=bool(args.skip_connections)))
+        stage("fit (cache, 192x288)", lambda: emulator.fit(
+            CACHE_DIR, None, trainer_params=dict(
+                max_epochs=args.epochs, batch_size=args.batch, num_workers=2,
+                sample_step=1, scenarios=train_scenarios, max_days=args.max_days,
+                accelerator="auto", devices=1,
+                model_path="/tmp/full_unet_models",
+                logger=False)))
+        emulator.save("/tmp/full_unet.pt")
+    # Free the training-side + GPU memory before the evaluate: predict
+    # accumulates ~12 GB of predictions and the reversal copies it; the GPU
+    # training arena otherwise lingers and the forward OOMs.
+    import gc, torch
     gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
     # ---------- evaluate (two passes; RAM-safe) ----------
     PRED_PATH = Path("/tmp/full_unet_predictions.zarr")

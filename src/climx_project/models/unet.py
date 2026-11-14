@@ -439,8 +439,15 @@ class UNetEmulator(Emulator):
                   .transpose("feature", "time", "lat", "lon")
                   .values.astype(np.float32))
             xb = xb.transpose(1, 0, 2, 3)
-            with torch.no_grad():
-                pred = self.model(torch.from_numpy(xb).to(device)).cpu().numpy()
+            # Sub-batch the forward: a 256-day chunk's activations at
+            # 192x288 are ~10 GB on the GPU (CUDA OOM observed). 32 days
+            # keeps the peak at ~1.2 GB.
+            preds = []
+            for s0 in range(0, len(xb), 32):
+                sub = torch.from_numpy(xb[s0:s0 + 32]).to(device)
+                with torch.no_grad():
+                    preds.append(self.model(sub).cpu().numpy())
+            pred = np.concatenate(preds, axis=0)
             tcoord = X["time"].isel(time=slice(t0, t1))
             chunks.append(xr.Dataset(
                 {v: (("time", "lat", "lon"), pred[:, i])
