@@ -157,10 +157,16 @@ class _BlockSampler(torch.utils.data.Sampler):
         blocks = defaultdict(list)
         for i, (scen, t) in enumerate(self.samples):
             blocks[(scen, t // self.block_days)].append(i)
+        # Shuffle the keys as a plain Python list: numpy's permutation would
+        # coerce the (str, int) tuples to STRING arrays (ints became strings)
+        # and every lookup missed - with a defaultdict, the miss silently
+        # created empty entries and the epoch had zero batches.
+        keys = list(blocks.keys())
+        rng.shuffle(keys)
         idxs = []
-        for b in rng.permutation(list(blocks.keys())):
-            rng.shuffle(blocks[tuple(b)])
-            idxs.extend(blocks[tuple(b)])
+        for b in keys:
+            rng.shuffle(blocks[b])
+            idxs.extend(blocks[b])
         return iter(idxs)
 
 
