@@ -89,7 +89,7 @@ def evaluate_pass1(emulator, raw_test: Path, metadata, pred_path: Path,
         for v in GHG:
             if v in yearly:
                 d = interp_to_days(yearly[v], y_float, chunk_days)
-                X[:, feature_order.index(v)] = (d - sc[v]["mean"]) / sc[v]["std"]
+                X[:, feature_order.index(v)] = ((d - sc[v]["mean"]) / sc[v]["std"]).reshape(-1, 1, 1)
         # seasonal
         doy = np.asarray([(t - time[0]).days % 365 for t in time[t0:t1]])
         phase = 2 * np.pi * doy / 365.25
