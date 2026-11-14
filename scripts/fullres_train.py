@@ -263,7 +263,8 @@ def main():
     # preprocessed X_test for that span would be ~152 GB, so the test
     # forcings are fetched (1.4 GB via HF) and transformed lazily per
     # predict chunk.
-    from climx_project.fullres_eval import (evaluate_pass1,
+    from climx_project.fullres_eval import (compute_indices_eagerly,
+                                            evaluate_pass1,
                                             open_hist_from_mount)
     raw_test = Path("/tmp/raw_full") / "NorESM2-MM_r1i1p1f1_with_forcing_test_forcings_ssp245.nc"
     if not raw_test.exists():
@@ -288,6 +289,15 @@ def main():
             predictions_path=PRED_PATH,
             historical_data_path=hist, TARGET_VARIABLES=paths.TARGET_VARIABLES,
             LOAD_PREDICTIONS=True, compute_indices=True))
+    # The 15 indices come back as lazy dask graphs over the prediction zarr +
+    # hist stores. Materialize them one at a time (the fused compute in
+    # build_submission OOM'd the session), then drop everything that is now
+    # dead weight before the parquet build.
+    indices_pred = stage("compute indices (one at a time)",
+                         lambda: compute_indices_eagerly(indices_pred))
+    del hist, X_test, metadata_test
+    gc.collect()
+    torch.cuda.empty_cache()
     parquet = stage("build submission parquet", lambda: submission.build_submission(
         indices_pred, "unet_full"))
     report = submission.verify_parquet(parquet)

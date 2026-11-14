@@ -1,11 +1,15 @@
 """Kaggle submission construction, verification, and upload.
 
 Path: indices dict -> format_indices -> drop forcing_scenario -> Dataset ->
-upscale 12x18 -> 192x288 -> write_kaggle_submission_parquet -> read-back check.
+upscale 12x18 -> 192x288 -> chunked parquet write -> read-back check.
 
 The starter's parquet writer SILENTLY zero-fills NaNs (with a warning), which
 would hide a real bug and produce a wrong submission — so we check for
-NaN/Inf BEFORE writing and fail loudly, and double-check afterwards.
+NaN/Inf BEFORE writing and fail loudly, and double-check afterwards. We also
+don't use the starter's writer anymore: it materializes the whole grid as ONE
+float64 DataFrame (4.75M x 16) plus a pyarrow Table, which OOM'd the Kaggle
+session on top of the 86-year index compute. _write_parquet_chunked appends
+row groups per time block instead (same row order and dtypes as the starter).
 
 CLI:
     python -m climx_project.submission verify <file.parquet>
@@ -16,7 +20,6 @@ import argparse
 import logging
 import subprocess
 import sys
-import warnings
 from pathlib import Path
 
 import numpy as np
@@ -34,8 +37,6 @@ KAGGLE_COMPETITION = "climx-main-track"
 
 def build_submission(indices_pred: dict[str, xr.DataArray], model: str) -> Path:
     """Format, upscale, and write the submission parquet. Returns its path."""
-    import src.utils.kaggle_submission as ks
-
     ds = _format_and_dataset(indices_pred, model)
     ds = upscale(ds)
 
@@ -48,16 +49,59 @@ def build_submission(indices_pred: dict[str, xr.DataArray], model: str) -> Path:
 
     out_path = paths.SUBMISSIONS_DIR / f"submission_{model}.parquet"
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        ks.write_kaggle_submission_parquet(ds, out_path)
-    for w in caught:
-        if "NaN" in str(w.message):
-            raise RuntimeError(f"Parquet writer zero-filled NaNs: {w.message}")
+    _write_parquet_chunked(ds, out_path)
 
     verify_parquet(out_path)
     logger.info("Submission written: %s", out_path)
     return out_path
+
+
+def _write_parquet_chunked(ds: xr.Dataset, out_path: Path,
+                           years_per_block: int = 2,
+                           compression: str = "snappy") -> None:
+    """Write the submission parquet in time blocks (row-group appends).
+
+    The starter's writer materializes the whole grid as ONE float64 DataFrame
+    (4.75M x 16) plus a pyarrow Table — a multi-GB peak that OOM'd the Kaggle
+    session after the 86-year index compute. Blocks bound the peak to a
+    single time slice. Row order and dtypes stay identical to the starter's
+    output (time-major; whole-number float columns cast to int64 — decided
+    once over the whole dataset so every row group shares one schema).
+    """
+    import src.utils.kaggle_submission as ks
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    ds = ds.sortby("time")
+    value_cols = list(ds.data_vars)
+    as_int = {}
+    for c in value_cols:
+        v = ds[c].values
+        as_int[c] = np.isfinite(v).all() and (v == v.astype(np.int64)).all()
+
+    tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
+    n = ds.sizes["time"]
+    ncells = ds.sizes["lat"] * ds.sizes["lon"]
+    writer = None
+    try:
+        for t0 in range(0, n, years_per_block):
+            sub = ds.isel(time=slice(t0, t0 + years_per_block))
+            df = ks.indices_xr_to_kaggle_dataframe(
+                sub, index_columns=ks.CLIMX_INDEX_COLUMNS, sort_coords=True)
+            df["row_id"] = np.arange(len(df), dtype=np.int64) + t0 * ncells
+            for c in value_cols:
+                if as_int[c]:
+                    df[c] = df[c].astype(np.int64)
+            table = pa.Table.from_pandas(df, preserve_index=False)
+            if writer is None:
+                writer = pq.ParquetWriter(tmp_path, table.schema,
+                                          compression=compression)
+            writer.write_table(table)
+            del df, table, sub
+    finally:
+        if writer is not None:
+            writer.close()
+    tmp_path.replace(out_path)
 
 
 def verify_parquet(path: Path, expected_rows: int = EXPECTED_ROWS) -> dict:

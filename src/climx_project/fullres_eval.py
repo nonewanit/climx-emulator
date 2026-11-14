@@ -80,6 +80,10 @@ def evaluate_pass1(emulator, raw_test: Path, metadata, pred_path: Path,
     stage_enc = {"dtype": "float16",
                  "compressors": [BloscCodec(cname="zstd", clevel=0,
                                             shuffle="noshuffle")]}
+    # psl is Pa (~1e5): every cell overflows fp16 after the reversal, and
+    # a store full of infs poisons anything read back from it. Give psl a
+    # fp32 store; the other six vars' anomalies fit fp16 comfortably.
+    stage_enc_psl = dict(stage_enc, dtype="float32")
 
     n = len(time)
     n_chunks = (n + time_chunk - 1) // time_chunk
@@ -127,7 +131,8 @@ def evaluate_pass1(emulator, raw_test: Path, metadata, pred_path: Path,
              for i, v in enumerate(emulator.target_vars)},
             coords={"time": tcoord, "lat": lat, "lon": lon},
         ).chunk({"time": 128, "lat": -1, "lon": -1})
-        enc = {v: stage_enc for v in ds_chunk.data_vars}
+        enc = {v: (stage_enc_psl if v == "psl" else stage_enc)
+               for v in ds_chunk.data_vars}
         if first:
             ds_chunk.to_zarr(stage_path, mode="w", encoding=enc)
             first = False
@@ -150,12 +155,44 @@ def evaluate_pass1(emulator, raw_test: Path, metadata, pred_path: Path,
             if var in log_info:
                 vals = np.minimum(vals, 12)
                 vals = (10 ** vals) - log_info[var]["epsilon"]
-            a[t0:t1] = vals.astype(np.float16)
+            # Guard the fp16 stores: the log cap above means pr can reach
+            # 10^12 mm/day in pathological cells — casting to fp16 overflows
+            # to inf (RuntimeWarning), and infs poison the indices computed
+            # from this store. Clip to the fp16 range; such cells are absurd
+            # model outputs either way. psl's fp32 store skips the clip.
+            if a.dtype == np.dtype("float16"):
+                np.clip(vals, -65504.0, 65504.0, out=vals)
+            a[t0:t1] = vals.astype(a.dtype)
     del g
     if pred_path.exists():
         shutil.rmtree(pred_path)
     stage_path.rename(pred_path)  # the stage IS the final predictions store
     log.info("pass 1 done; stage became %s", pred_path)
+
+
+def compute_indices_eagerly(indices_pred: dict) -> dict:
+    """Materialize each index ONE AT A TIME.
+
+    emulator.evaluate returns the indices as LAZY dask graphs over the
+    prediction zarr + hist stores (its tqdm loop only builds graphs — the
+    percentile indices especially). build_submission's ds.compute() then
+    fuses all 15 graphs into one merged compute with shared chunk reads
+    and xclim's float64 promotion — that merged compute OOM'd the Kaggle
+    session. One at a time, the scheduler releases each graph before the
+    next, bounding the peak to a single index.
+    """
+    import dask.array as da
+    import gc
+
+    out = {}
+    for name, v in indices_pred.items():
+        if isinstance(v.data, da.Array):
+            log.info("computing index %s (lazy graph)", name)
+            out[name] = v.compute()
+            gc.collect()
+        else:
+            out[name] = v
+    return out
 
 
 def open_hist_from_mount(mount_dirs, cache_dir: Path) -> xr.Dataset:
