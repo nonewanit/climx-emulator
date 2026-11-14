@@ -138,7 +138,6 @@ def main():
                                                  only_scenarios=train_scenarios,
                                                  skip_x_test=True, skip_hist=True))
         metadata_test = _metadata_for()
-        hist = open_hist_from_cache(CACHE_DIR)
         ds = None
     else:
         # ---------- build-in-session mode ----------
