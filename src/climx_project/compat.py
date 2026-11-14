@@ -10,6 +10,8 @@
    is patched the same way preemptively.
 
 2. Starter-kit stationarization reversal (see `_patch_stationarize_reverse`).
+
+3. Hist-dependent index replacements (see `_patch_hist_indices`).
 """
 
 import logging
@@ -107,9 +109,34 @@ def _patch_compute_scaling_params() -> None:
     logger.info("Applied single-pass compute_scaling_params patch")
 
 
+def _patch_hist_indices() -> None:
+    """Replace the hist-dependent indices (WSDI/CSDI/R95p) with the numpy
+    streaming versions from indices_numpy.
+
+    The starter's dask implementations rechunk time to ONE chunk so xclim's
+    run-length helpers work; on the lite 12x18 grid that is ~50 MB, but on
+    the full 192x288 grid a single chunk is 7-14 GB per array and the WSDI
+    graph OOM'd the Kaggle session. The numpy versions stream year by year
+    with the exact same math (see indices_numpy module docstring).
+    """
+    import src.indices_xclim as I
+    from . import indices_numpy
+
+    _ORIGINAL_HIST_INDICES.update(
+        {k: I.SELECTED_INDICES[k] for k in ("WSDI", "CSDI", "R95p")})
+    I.SELECTED_INDICES["WSDI"] = indices_numpy.wsdi
+    I.SELECTED_INDICES["CSDI"] = indices_numpy.csdi
+    I.SELECTED_INDICES["R95p"] = indices_numpy.r95p
+    logger.info("Applied numpy WSDI/CSDI/R95p replacements")
+
+
+_ORIGINAL_HIST_INDICES: dict = {}
+
+
 def apply() -> None:
     _xr_dt._strftime_through_cftimeindex = _strftime_through_cftimeindex
     _xr_dt._strftime_through_series = _strftime_through_series
     _patch_stationarize_reverse()
     _patch_compute_scaling_params()
+    _patch_hist_indices()
     logger.info("Applied xarray strftime/ArrowStringArray compatibility patch")
