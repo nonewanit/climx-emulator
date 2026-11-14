@@ -163,10 +163,15 @@ def write_hist_window(hist_ds, cache_dir: Path, encoding: dict,
             shutil.rmtree(tmp)
         log.info("=== write hist window %s ===", var)
         da = win[var]
-        # chunked write (no full-array materialization): CPU sessions have
-        # small RAM; the hist file is LOCAL so chunk-walk speed is irrelevant.
-        da.astype("float16").chunk({"time": 128, "lat": -1, "lon": -1}).to_zarr(
-            tmp, mode="w", encoding={var: encoding})
+        # fp32 storage: psl (~100 kPa) OVERFLOWS fp16 (max 65,504) — the
+        # fp16 cast produced inf/nan and an empty store (observed twice, with
+        # 'overflow encountered in cast'). Chunked write, no full-array
+        # materialization (CPU sessions have small RAM; the hist file is
+        # LOCAL so chunk-walk speed is irrelevant).
+        enc32 = dict(encoding)
+        enc32["dtype"] = "float32"
+        da.chunk({"time": 128, "lat": -1, "lon": -1}).to_zarr(
+            tmp, mode="w", encoding={var: enc32})
         tmp.rename(out)
         gb = _dir_size(out) / 1e9
         log.info("OK hist %s (%.3f GB)", var, gb)
