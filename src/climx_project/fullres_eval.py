@@ -30,6 +30,9 @@ def evaluate_pass1(emulator, raw_test: Path, metadata, pred_path: Path,
                    time_chunk: int = 256) -> None:
     """Predict over the full 2015-2100 test forcings (chunk-wise numpy
     preprocessing) + reversal + fp16 final zarr."""
+    if pred_path.exists():
+        log.info("final predictions exist at %s — reusing (skipping pass 1)", pred_path)
+        return
     sc = metadata["scaling_params"]["scaling_params"]
     log_info = metadata["scaling_params"].get("_log_transform_info", {})
     device = next(emulator.model.parameters()).device
@@ -162,9 +165,11 @@ def open_hist_from_mount(mount_dirs, cache_dir: Path) -> xr.Dataset:
     needed = {"tas", "tasmax", "tasmin", "pr"}
     ds = xr.Dataset()
     for d in mount_dirs:
-        for p in sorted(Path(d).glob("hist_*.zarrpkg")):
-            var = p.name.split("_")[1]
-            if var not in needed:
+        for var in sorted(needed):
+            # direct-name lookup: glob patterns were unreliable on the FUSE
+            # mount (the files exist - verified - but glob found nothing)
+            p = Path(d) / f"hist_{var}.zarr.zarrpkg"
+            if not p.exists():
                 continue
             store_dir = cache_dir / f"hist_{var}.zarr"
             if store_dir.exists():
