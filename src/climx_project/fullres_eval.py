@@ -65,8 +65,12 @@ def evaluate_pass1(emulator, raw_test: Path, metadata, pred_path: Path,
         return src[lo] * (1 - w) + src[lo + 1] * w
 
     stage_path = Path("/tmp/pred_stage.zarr")
-    if stage_path.exists():
-        shutil.rmtree(stage_path)
+    reuse_stage = stage_path.exists() and (stage_path / "zarr.json").exists()
+    if reuse_stage:
+        log.info("stage exists — reusing it (skipping the predict loop)")
+    else:
+        if stage_path.exists():
+            shutil.rmtree(stage_path)
     # transient store: no compression (faster appends; the final zarr is
     # the one that persists)
     from zarr.codecs import BloscCodec
@@ -79,7 +83,7 @@ def evaluate_pass1(emulator, raw_test: Path, metadata, pred_path: Path,
     feature_order = list(emulator.feature_vars)
     import time as _time
     first = True
-    for ci, t0 in enumerate(range(0, n, time_chunk)):
+    for ci, t0 in enumerate(range(0, n, time_chunk) if not reuse_stage else []):
         t1 = min(n, t0 + time_chunk)
         log.info("predict chunk %d/%d (days %d-%d)", ci + 1, n_chunks, t0, t1)
         t_pre0 = _time.time()
@@ -129,22 +133,26 @@ def evaluate_pass1(emulator, raw_test: Path, metadata, pred_path: Path,
         del pred, ds_chunk
         log.info("  chunk %d: stage write %.1f s", ci + 1, _time.time() - t_w0)
 
-    # Reversal (lazy, over the fp16 stage) + fp16 final write.
-    y_pred_scaled = xr.open_zarr(stage_path, chunks={"time": 365})
-    out = y_pred_scaled
-    for var in list(out.data_vars):
-        out[var] = out[var].astype(np.float32) * sc[var]["std"] + sc[var]["mean"]
-    for var, info in log_info.items():
-        if var in out:
-            out[var] = np.minimum(out[var], 12)
-            out[var] = (10 ** out[var]) - info["epsilon"]
-    out = out.astype(np.float32)
-    log.info("writing final predictions (fp16) to %s", pred_path)
-    out.chunk({"time": 128, "lat": -1, "lon": -1}).to_zarr(
-        pred_path, mode="w", encoding={v: stage_enc for v in out.data_vars})
-    del out, y_pred_scaled
-    shutil.rmtree(stage_path)
-    log.info("pass 1 done; stage deleted")
+    # IN-PLACE reversal: overwrite the stage chunks with the physical values
+    # (no second store — the session's effective write budget is ~45-50 GB
+    # and the stage+final pair exceeded it, flipping /tmp read-only).
+    import zarr
+    g = zarr.open_group(str(stage_path), mode="a")
+    for var in list(emulator.target_vars):
+        a = g[var]
+        n = a.shape[0]
+        for t0 in range(0, n, 128):
+            t1 = min(n, t0 + 128)
+            vals = a[t0:t1].astype(np.float32) * sc[var]["std"] + sc[var]["mean"]
+            if var in log_info:
+                vals = np.minimum(vals, 12)
+                vals = (10 ** vals) - log_info[var]["epsilon"]
+            a[t0:t1] = vals.astype(np.float16)
+    del g
+    if pred_path.exists():
+        shutil.rmtree(pred_path)
+    stage_path.rename(pred_path)  # the stage IS the final predictions store
+    log.info("pass 1 done; stage became %s", pred_path)
 
 
 def open_hist_from_mount(mount_dirs, cache_dir: Path) -> xr.Dataset:
