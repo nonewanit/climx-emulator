@@ -429,8 +429,17 @@ class UNetEmulator(Emulator):
 
         X = X[self.feature_vars]
         device = next(self.model.parameters()).device
-        chunks = []
         n_time = X.sizes["time"]
+        # STREAM to a zarr store chunk-by-chunk and return a LAZY dataset:
+        # the in-memory concat held ~11.3 GB of predictions and the starter's
+        # reversal then copied it (~25 GB peak) — the kernel was OOM-killed.
+        # The lazy path keeps the peak at ~2 GB and the starter's reversal
+        # and to_zarr run chunk-wise.
+        import shutil
+        stage_path = Path("/tmp/pred_stage.zarr")
+        if stage_path.exists():
+            shutil.rmtree(stage_path)
+        first = True
         for t0 in range(0, n_time, time_chunk):
             t1 = min(n_time, t0 + time_chunk)
             # (feature, time, lat, lon) -> (time, feature, lat, lon): each day
@@ -441,20 +450,27 @@ class UNetEmulator(Emulator):
             xb = xb.transpose(1, 0, 2, 3)
             # Sub-batch the forward: a 256-day chunk's activations at
             # 192x288 are ~10 GB on the GPU (CUDA OOM observed). 32 days
-            # keeps the peak at ~1.2 GB.
+            # keeps the GPU peak at ~1.2 GB.
             preds = []
             for s0 in range(0, len(xb), 32):
                 sub = torch.from_numpy(xb[s0:s0 + 32]).to(device)
                 with torch.no_grad():
                     preds.append(self.model(sub).cpu().numpy())
             pred = np.concatenate(preds, axis=0)
+            del xb, preds
             tcoord = X["time"].isel(time=slice(t0, t1))
-            chunks.append(xr.Dataset(
+            ds_chunk = xr.Dataset(
                 {v: (("time", "lat", "lon"), pred[:, i])
                  for i, v in enumerate(self.target_vars)},
                 coords={"time": tcoord, "lat": X["lat"], "lon": X["lon"]},
-            ))
-        return xr.concat(chunks, dim="time")
+            ).chunk({"time": 128, "lat": -1, "lon": -1})
+            if first:
+                ds_chunk.to_zarr(stage_path, mode="w")
+                first = False
+            else:
+                ds_chunk.to_zarr(stage_path, mode="a", append_dim="time")
+            del pred, ds_chunk
+        return xr.open_zarr(stage_path, chunks={"time": 365})
 
     def save(self, path):
         Path(path).parent.mkdir(parents=True, exist_ok=True)
