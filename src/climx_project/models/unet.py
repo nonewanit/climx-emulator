@@ -338,7 +338,7 @@ class UNetEmulator(Emulator):
         callbacks.append(EarlyStopping(
             monitor="val_loss", mode="min",
             patience=int(tp.get("early_stop_patience", 3)), min_delta=1e-4,
-            verbose=True,
+            verbose=True, check_on_train_epoch_end=False,
         ))
         trainer_kwargs["callbacks"] = callbacks
 
