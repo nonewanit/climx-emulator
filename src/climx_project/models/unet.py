@@ -436,6 +436,8 @@ class UNetEmulator(Emulator):
         # The lazy path keeps the peak at ~2 GB and the starter's reversal
         # and to_zarr run chunk-wise.
         import shutil
+        from climx_project.cacheio import zarr_fp16_encoding
+        stage_enc = zarr_fp16_encoding()
         stage_path = Path("/tmp/pred_stage.zarr")
         if stage_path.exists():
             shutil.rmtree(stage_path)
@@ -466,8 +468,9 @@ class UNetEmulator(Emulator):
                  for i, v in enumerate(self.target_vars)},
                 coords={"time": tcoord, "lat": X["lat"], "lon": X["lon"]},
             ).chunk({"time": 128, "lat": -1, "lon": -1})
+            enc = {v: stage_enc for v in ds_chunk.data_vars}
             if first:
-                ds_chunk.to_zarr(stage_path, mode="w")
+                ds_chunk.to_zarr(stage_path, mode="w", encoding=enc)
                 first = False
             else:
                 ds_chunk.to_zarr(stage_path, mode="a", append_dim="time")

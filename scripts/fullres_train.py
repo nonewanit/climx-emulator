@@ -122,28 +122,21 @@ def main():
             SCALING_JSON.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(BUNDLED_SCALING, SCALING_JSON)
             MODE_MARKER.write_text("none")
+        # The evaluate needs: the raw test forcings (1.4 GB, via HF) and the
+        # hist window (read from the mount on demand). X_test.nc and the
+        # hist packages are NOT copied: the 86-year submission makes the
+        # preprocessed X_test ~152 GB, so the forcings are transformed
+        # lazily per predict chunk instead.
         if args.load_model:
-            # No fit: the scenario stores are unnecessary — skip them and
-            # copy X_test locally instead (the mount read made predict crawl
-            # at ~1-2 h; the local copy is ~18 min sequential).
             stage("copy cache datasets to /tmp",
                   lambda: copy_datasets_to_cache(from_cache_dirs, CACHE_DIR,
                                                  only_scenarios=[],
-                                                 skip_x_test=False))
-            X_test = xr.open_dataset(CACHE_DIR / "X_test.nc",
-                                     chunks={"time": 256, "lat": -1, "lon": -1})
+                                                 skip_x_test=True, skip_hist=True))
         else:
             stage("copy cache datasets to /tmp",
                   lambda: copy_datasets_to_cache(from_cache_dirs, CACHE_DIR,
                                                  only_scenarios=train_scenarios,
-                                                 skip_x_test=True))
-            # X_test.nc stays on the mount (27 GB — the quota can't hold it
-            # alongside the scenario stores): predict reads it directly.
-            xt_path = next((Path(d) / "X_test.nc" for d in from_cache_dirs
-                            if (Path(d) / "X_test.nc").exists()), None)
-            if xt_path is None:
-                raise FileNotFoundError("X_test.nc not found in the attached datasets")
-            X_test = xr.open_dataset(xt_path, chunks={"time": 256, "lat": -1, "lon": -1})
+                                                 skip_x_test=True, skip_hist=True))
         metadata_test = _metadata_for()
         hist = open_hist_from_cache(CACHE_DIR)
         ds = None
@@ -249,6 +242,10 @@ def main():
                 model_path="/tmp/full_unet_models",
                 logger=False)))
         emulator.save("/tmp/full_unet.pt")
+        # The scenario stores are dead weight after training — free the
+        # storage quota before the evaluate.
+        for dead in list(CACHE_DIR.glob("X_*.zarr")) + list(CACHE_DIR.glob("y_*.zarr")):
+            shutil.rmtree(dead)
     # Free the training-side + GPU memory before the evaluate: predict
     # accumulates ~12 GB of predictions and the reversal copies it; the GPU
     # training arena otherwise lingers and the forward OOMs.
@@ -257,18 +254,31 @@ def main():
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
-    # ---------- evaluate (two passes; RAM-safe) ----------
+    # ---------- evaluate (86-year submission) ----------
+    # The submission wants the indices over the FULL 2015-2100 span
+    # (86 yearly values x grid — verified against sample_submission). The
+    # preprocessed X_test for that span would be ~152 GB, so the test
+    # forcings are fetched (1.4 GB via HF) and transformed lazily per
+    # predict chunk.
+    from climx_project.fullres_eval import (build_test_forcings_lazy,
+                                            evaluate_pass1, open_hist_from_mount)
+    raw_test = Path("/tmp/raw_full") / "NorESM2-MM_r1i1p1f1_with_forcing_test_forcings_ssp245.nc"
+    if not raw_test.exists():
+        from huggingface_hub import hf_hub_download
+        log.info("hf download test forcings (1.4 GB)")
+        p_dl = hf_hub_download(
+            repo_id="isp-uv-es/ClimX", repo_type="dataset",
+            filename="full/NorESM2-MM_r1i1p1f1_with_forcing_test_forcings_ssp245.nc",
+            local_dir=str(Path("/tmp/hf_tmp")))
+        raw_test.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(p_dl, raw_test)
+    X_test = stage("build lazy test forcings (2015-2100)",
+                   lambda: build_test_forcings_lazy(raw_test, SCALING_JSON))
     PRED_PATH = Path("/tmp/full_unet_predictions.zarr")
-    y_phys, _ = stage(
-        "evaluate pass 1 (predict + reversal + save)", lambda: emulator.evaluate(
-            X_test, metadata_test,
-            results_path=Path("/tmp/full_unet_evaluation.json"),
-            predictions_path=PRED_PATH,
-            historical_data_path=hist, TARGET_VARIABLES=paths.TARGET_VARIABLES,
-            LOAD_PREDICTIONS=False, compute_indices=False))
-    del y_phys
-    import gc
-    gc.collect()
+    stage("evaluate pass 1 (predict + reversal + save, fp16)",
+          lambda: evaluate_pass1(emulator, X_test, metadata_test, PRED_PATH))
+    hist = stage("open hist window from mount",
+                 lambda: open_hist_from_mount(from_cache_dirs, CACHE_DIR))
     _, indices_pred = stage(
         "evaluate pass 2 (indices from saved predictions)", lambda: emulator.evaluate(
             X_test, metadata_test,

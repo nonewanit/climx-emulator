@@ -384,7 +384,8 @@ def upload_cache(cache_dir: Path, owner: str, manifest_path: Path,
 
 
 def copy_datasets_to_cache(mount_dirs, cache_dir: Path,
-                          only_scenarios=None, skip_x_test: bool = False) -> None:
+                          only_scenarios=None, skip_x_test: bool = False,
+                          skip_hist: bool = False) -> None:
     """Copy attached cache-dataset files to /tmp (sequential reads at the
     mount's ~26 MB/s — the only mount I/O training pays). Zarr stores
     arrive as <name>.zarr.zip (the upload zipped the dirs); unzip them."""
@@ -398,7 +399,7 @@ def copy_datasets_to_cache(mount_dirs, cache_dir: Path,
         if not p.name.endswith(".zarrpkg"):
             return False
         if p.name.startswith("hist_"):
-            return True
+            return not skip_hist
         if only_scenarios is None:
             return True
         # package names are <var>_<scen>.zarr.zarrpkg — match '_<scen>.zarr'
