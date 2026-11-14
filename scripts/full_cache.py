@@ -201,7 +201,12 @@ def main():
             # Hist window: 1961-1990 lies entirely inside the second hist file.
             hist_raw = download_one(f"{PREFIX}hist_train_1932_2014.nc")
             hist_ds = xr.open_dataset(hist_raw, engine="h5netcdf", chunks=_HIST_CHUNKS)
-            write_hist_window(hist_ds, CACHE_DIR, ENCODING, skip=uploaded_set())
+            # the EXTRAS manifest is the skip authority for the extras (the
+            # scenario manifest has no hist entries)
+            extras_manifest = paths.PROJECT_ROOT / "data" / "full_cache_manifest_extras.json"
+            m = json.load(open(extras_manifest)) if extras_manifest.exists() else {}
+            extras_uploaded = {f for files in m.values() for f in files}
+            write_hist_window(hist_ds, CACHE_DIR, ENCODING, skip=extras_uploaded)
             hist_raw.unlink()
 
         return {"uploaded_set": uploaded_set, "download_one": download_one,
