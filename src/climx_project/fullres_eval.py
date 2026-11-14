@@ -67,15 +67,22 @@ def evaluate_pass1(emulator, raw_test: Path, metadata, pred_path: Path,
     stage_path = Path("/tmp/pred_stage.zarr")
     if stage_path.exists():
         shutil.rmtree(stage_path)
-    stage_enc = zarr_fp16_encoding()
+    # transient store: no compression (faster appends; the final zarr is
+    # the one that persists)
+    from zarr.codecs import BloscCodec
+    stage_enc = {"dtype": "float16",
+                 "compressors": [BloscCodec(cname="zstd", clevel=0,
+                                            shuffle="noshuffle")]}
 
     n = len(time)
     n_chunks = (n + time_chunk - 1) // time_chunk
     feature_order = list(emulator.feature_vars)
+    import time as _time
     first = True
     for ci, t0 in enumerate(range(0, n, time_chunk)):
         t1 = min(n, t0 + time_chunk)
         log.info("predict chunk %d/%d (days %d-%d)", ci + 1, n_chunks, t0, t1)
+        t_pre0 = _time.time()
         chunk_days = day_float[t0:t1]
         X = np.empty((t1 - t0, 22, len(lat), len(lon)), dtype=np.float32)
         # aerosols: interp monthly -> chunk days (vectorized), log10, split
@@ -96,6 +103,8 @@ def evaluate_pass1(emulator, raw_test: Path, metadata, pred_path: Path,
         X[:, feature_order.index("sin_doy")] = np.sin(phase)[:, None, None]
         X[:, feature_order.index("cos_doy")] = np.cos(phase)[:, None, None]
 
+        log.info("  chunk %d: preprocess %.1f s", ci + 1, _time.time() - t_pre0)
+        t_fwd0 = _time.time()
         preds = []
         for s0 in range(0, len(X), 32):
             sub = torch.from_numpy(X[s0:s0 + 32]).to(device)
@@ -103,6 +112,8 @@ def evaluate_pass1(emulator, raw_test: Path, metadata, pred_path: Path,
                 preds.append(emulator.model(sub).cpu().numpy())
         pred = np.concatenate(preds, axis=0)
         del X, preds
+        log.info("  chunk %d: forwards %.1f s", ci + 1, _time.time() - t_fwd0)
+        t_w0 = _time.time()
         tcoord = time[t0:t1]
         ds_chunk = xr.Dataset(
             {v: (("time", "lat", "lon"), pred[:, i].astype(np.float16))
@@ -116,6 +127,7 @@ def evaluate_pass1(emulator, raw_test: Path, metadata, pred_path: Path,
         else:
             ds_chunk.to_zarr(stage_path, mode="a", append_dim="time")
         del pred, ds_chunk
+        log.info("  chunk %d: stage write %.1f s", ci + 1, _time.time() - t_w0)
 
     # Reversal (lazy, over the fp16 stage) + fp16 final write.
     y_pred_scaled = xr.open_zarr(stage_path, chunks={"time": 365})
