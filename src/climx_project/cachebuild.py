@@ -366,7 +366,12 @@ def upload_cache(cache_dir: Path, owner: str, manifest_path: Path,
                     and (p.stem if p.suffix == ".zarr" else p.name) not in uploaded
                     and not p.name.startswith(".tmp")],
                    key=lambda p: p.name)
-    pkg_files = sorted(include_pkg_from.glob("X_*.zarrpkg")) if include_pkg_from else []
+    pkg_files = []
+    if include_pkg_from:
+        new_stems = {p.stem if p.suffix == ".zarr" else p.name for p in files}
+        pkg_files = sorted(
+            q for q in include_pkg_from.glob("*.zarrpkg")
+            if q.name[:-8].rsplit(".zarr", 1)[0] not in new_stems)
     if not files:
         # nothing NEW to upload — skip even when a recover dir is present
         # (re-uploading a complete dataset as a redundant version is waste).
