@@ -260,8 +260,8 @@ def main():
     # preprocessed X_test for that span would be ~152 GB, so the test
     # forcings are fetched (1.4 GB via HF) and transformed lazily per
     # predict chunk.
-    from climx_project.fullres_eval import (build_test_forcings_lazy,
-                                            evaluate_pass1, open_hist_from_mount)
+    from climx_project.fullres_eval import (evaluate_pass1,
+                                            open_hist_from_mount)
     raw_test = Path("/tmp/raw_full") / "NorESM2-MM_r1i1p1f1_with_forcing_test_forcings_ssp245.nc"
     if not raw_test.exists():
         from huggingface_hub import hf_hub_download
@@ -272,11 +272,10 @@ def main():
             local_dir=str(Path("/tmp/hf_tmp")))
         raw_test.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(p_dl, raw_test)
-    X_test = stage("build lazy test forcings (2015-2100)",
-                   lambda: build_test_forcings_lazy(raw_test, SCALING_JSON))
     PRED_PATH = Path("/tmp/full_unet_predictions.zarr")
     stage("evaluate pass 1 (predict + reversal + save, fp16)",
-          lambda: evaluate_pass1(emulator, X_test, metadata_test, PRED_PATH))
+          lambda: evaluate_pass1(emulator, raw_test, metadata_test, PRED_PATH))
+    X_test = raw_test  # pass 2 loads the saved predictions; X_test is unused
     hist = stage("open hist window from mount",
                  lambda: open_hist_from_mount(from_cache_dirs, CACHE_DIR))
     _, indices_pred = stage(
