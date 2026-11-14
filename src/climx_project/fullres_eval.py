@@ -179,9 +179,12 @@ def open_hist_from_mount(mount_dirs, cache_dir: Path) -> xr.Dataset:
             if not (store_dir / "zarr.json").exists():
                 (store_dir / "zarr.json").write_text(json.dumps(
                     {"zarr_format": 3, "node_type": "group", "attributes": {}}))
-            da = xr.open_zarr(store_dir)[var]
-            ds[var] = da.compute()
-            shutil.rmtree(store_dir)
+            # LAZY open (chunked): loading the window in memory (9.6 GB) on
+            # top of the index computations OOM'd the kernel at index 7/15.
+            # The stores stay on disk (~9.6 GB total, under the budget) and
+            # the percentile computations stream chunk-wise.
+            da = xr.open_zarr(store_dir, chunks={"time": 128, "lat": -1, "lon": -1})[var]
+            ds[var] = da
     if not ds.data_vars:
         raise FileNotFoundError("no hist_*.zarrpkg found in the attached datasets")
     return ds
