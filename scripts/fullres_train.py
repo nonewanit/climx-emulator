@@ -87,6 +87,10 @@ def main():
     ap.add_argument("--base-channels", type=int, default=64)
     ap.add_argument("--learning-rate", type=float, default=1e-3)
     ap.add_argument("--skip-connections", type=int, default=1, choices=(0, 1))
+    ap.add_argument("--scenarios", default=",".join(SCENARIOS),
+                    help="comma-separated scenarios to train on (the session "
+                         "storage quota ~57.6 GiB can't hold the full x1 cache "
+                         "- one scenario ~24 GB + hist ~11 GB fits)")
     ap.add_argument("--max-days", type=int, default=0,
                     help=">0 = smoke: truncate training days per scenario")
     args = ap.parse_args()
@@ -97,6 +101,7 @@ def main():
                                          capture_output=True, text=True).stdout)
 
     from_cache_dirs = [d for d in os.environ.get("CLIMX_CACHE_INPUT_DIRS", "").split(":") if d]
+    train_scenarios = [x.strip() for x in args.scenarios.split(",") if x.strip()]
     mode = "none"
 
     def _metadata_for():
@@ -115,9 +120,16 @@ def main():
             shutil.copy2(BUNDLED_SCALING, SCALING_JSON)
             MODE_MARKER.write_text("none")
         stage("copy cache datasets to /tmp",
-              lambda: copy_datasets_to_cache(from_cache_dirs, CACHE_DIR))
-        X_test = xr.open_dataset(CACHE_DIR / "X_test.nc",
-                                 chunks={"time": 512, "lat": -1, "lon": -1})
+              lambda: copy_datasets_to_cache(from_cache_dirs, CACHE_DIR,
+                                             only_scenarios=train_scenarios,
+                                             skip_x_test=True))
+        # X_test.nc stays on the mount (27 GB — the quota can't hold it):
+        # predict reads it directly from the extras dataset.
+        xt_path = next((Path(d) / "X_test.nc" for d in from_cache_dirs
+                        if (Path(d) / "X_test.nc").exists()), None)
+        if xt_path is None:
+            raise FileNotFoundError("X_test.nc not found in the attached datasets")
+        X_test = xr.open_dataset(xt_path, chunks={"time": 512, "lat": -1, "lon": -1})
         metadata_test = _metadata_for()
         hist = open_hist_from_cache(CACHE_DIR)
         ds = None
@@ -209,7 +221,7 @@ def main():
     stage("fit (cache, 192x288)", lambda: emulator.fit(
         CACHE_DIR, None, trainer_params=dict(
             max_epochs=args.epochs, batch_size=args.batch, num_workers=2,
-            sample_step=1, scenarios=SCENARIOS, max_days=args.max_days,
+            sample_step=1, scenarios=train_scenarios, max_days=args.max_days,
             accelerator="auto", devices=1,
             model_path="/tmp/full_unet_models",
             logger=False)))

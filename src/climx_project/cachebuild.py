@@ -383,18 +383,33 @@ def upload_cache(cache_dir: Path, owner: str, manifest_path: Path,
     return json.load(open(manifest_path))
 
 
-def copy_datasets_to_cache(mount_dirs, cache_dir: Path) -> None:
+def copy_datasets_to_cache(mount_dirs, cache_dir: Path,
+                          only_scenarios=None, skip_x_test: bool = False) -> None:
     """Copy attached cache-dataset files to /tmp (sequential reads at the
     mount's ~26 MB/s — the only mount I/O training pays). Zarr stores
     arrive as <name>.zarr.zip (the upload zipped the dirs); unzip them."""
     import zipfile
+    # The session storage quota is ~57.6 GiB: unpack ONLY the selected
+    # scenarios' stores (+ hist) and leave X_test.nc on the mount (predict
+    # reads it directly — a single sequential pass).
+    def _wanted(p) -> bool:
+        if p.name == "X_test.nc":
+            return not skip_x_test
+        if not p.name.endswith(".zarrpkg"):
+            return False
+        if p.name.startswith("hist_"):
+            return True
+        if only_scenarios is None:
+            return True
+        return any(f"_{sc}_" in p.name for sc in only_scenarios)
     total_pkg = sum(p.stat().st_size for d in mount_dirs
-                    for p in Path(d).iterdir()
-                    if p.name.endswith(".zarrpkg") or p.name == "X_test.nc")
+                    for p in Path(d).iterdir() if _wanted(p))
     df = subprocess.run(["df", "-h", "/tmp"], capture_output=True, text=True).stdout
     log.info("copy start: %.1f GB to unpack; %s", total_pkg / 1e9, df.strip().splitlines()[-1])
     for d in mount_dirs:
         for p in sorted(Path(d).iterdir()):
+            if not _wanted(p):
+                continue
             if p.name.endswith(".zarrpkg"):
                 dst = cache_dir / p.name[:-8]  # strip ".zarrpkg" -> <name>.zarr
                 has_root = (dst / "zarr.json").exists() or (dst / ".zgroup").exists()
