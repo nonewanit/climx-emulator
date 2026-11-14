@@ -26,13 +26,30 @@ AEROSOLS = ["BC_AX", "BC_N", "SO2", "SO4_PR", "OM_NI"]
 GHG = ["CO2_LBC", "N2O_LBC", "CH4_LBC", "CFC11eq_LBC", "CF2CL2_LBC"]
 
 
+# Bumped after the fp16-clip + fp32-psl reversal fix: stores reversed by the
+# OLD code contain infs (pr's 10^12 log-cap and psl's ~1e5 Pa overflowed the
+# fp16 cast) and must be recomputed. Stores carry this marker as a sidecar.
+REVERSAL_VERSION = "2"
+
+
+def _reversal_marker(pred_path: Path) -> Path:
+    return Path(str(pred_path) + ".reversal_version")
+
+
 def evaluate_pass1(emulator, raw_test: Path, metadata, pred_path: Path,
                    time_chunk: int = 256) -> None:
     """Predict over the full 2015-2100 test forcings (chunk-wise numpy
     preprocessing) + reversal + fp16 final zarr."""
     if pred_path.exists():
-        log.info("final predictions exist at %s — reusing (skipping pass 1)", pred_path)
-        return
+        marker = _reversal_marker(pred_path)
+        if marker.exists() and marker.read_text().strip() == REVERSAL_VERSION:
+            log.info("final predictions exist (reversal v%s) — reusing "
+                     "(skipping pass 1)", REVERSAL_VERSION)
+            return
+        log.warning("final predictions exist but lack reversal v%s — stale "
+                    "store (pre-clip reversal, contains infs); recomputing",
+                    REVERSAL_VERSION)
+        shutil.rmtree(pred_path)
     sc = metadata["scaling_params"]["scaling_params"]
     log_info = metadata["scaling_params"].get("_log_transform_info", {})
     device = next(emulator.model.parameters()).device
@@ -167,7 +184,9 @@ def evaluate_pass1(emulator, raw_test: Path, metadata, pred_path: Path,
     if pred_path.exists():
         shutil.rmtree(pred_path)
     stage_path.rename(pred_path)  # the stage IS the final predictions store
-    log.info("pass 1 done; stage became %s", pred_path)
+    _reversal_marker(pred_path).write_text(REVERSAL_VERSION)
+    log.info("pass 1 done; stage became %s (reversal v%s)",
+             pred_path, REVERSAL_VERSION)
 
 
 def compute_indices_eagerly(indices_pred: dict) -> dict:
