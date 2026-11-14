@@ -146,7 +146,7 @@ class _CacheDataset(Dataset):
     """
 
     def __init__(self, cache_dir: Path, scenarios, day_indices, step: int = 1,
-                 block_days: int = 64, cache_blocks: int = 6):
+                 block_days: int = 128, cache_blocks: int = 12):
         self.block_days = block_days
         self.cache: dict = {}
         self.lru: list = []
@@ -154,6 +154,11 @@ class _CacheDataset(Dataset):
         self.x_paths = {}
         self.y_paths = {}
         self.time = {}
+        # Open every store ONCE and keep the handles: re-opening 29 stores per
+        # block load (xr.open_zarr metadata reads) made the training loop
+        # crawl at ~50 s/batch. Direct zarr chunk reads are milliseconds.
+        import zarr
+        self.groups = {}
         for scen in scenarios:
             self.x_paths[scen] = sorted((cache_dir / f"X_{scen}").glob("*.zarr")) \
                 if (cache_dir / f"X_{scen}").is_dir() \
@@ -163,6 +168,11 @@ class _CacheDataset(Dataset):
             if not self.x_paths[scen] or not self.y_paths[scen]:
                 raise FileNotFoundError(
                     f"No cache files for scenario {scen} under {cache_dir}")
+            self.groups[scen] = {}
+            for p in self.x_paths[scen] + self.y_paths[scen]:
+                g = zarr.open_group(str(p), mode="r")
+                var = next(k for k in g.array_keys() if g[k].ndim == 3)
+                self.groups[scen][str(p)] = (g, var)
             self.time[scen] = xr.open_zarr(self.x_paths[scen][0]).time.values
         self.samples = [(scen, t) for scen in scenarios
                         for t in day_indices[scen][::step]]
@@ -176,14 +186,10 @@ class _CacheDataset(Dataset):
         tsel = slice(t0, t1)
 
         def read_var(p):
-            # each store holds one variable: the array named in the file stem
-            ds = xr.open_zarr(p).isel(time=tsel)
-            name = list(ds.data_vars)[0]
-            arr = ds[name].values.astype(np.float32)
+            g, var = self.groups[scen][str(p)]
+            arr = g[var][tsel].astype(np.float32)
             if arr.shape[0] == 0:
-                raise RuntimeError(
-                    f"{p.name}: empty read at time {tsel}; opened sizes "
-                    f"{dict(ds.sizes)}")
+                raise RuntimeError(f"{p.name}: empty read at time {tsel}")
             return arr
 
         xs = [read_var(p) for p in self.x_paths[scen]]
