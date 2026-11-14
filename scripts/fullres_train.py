@@ -226,6 +226,10 @@ def main():
             variable_weights=[1.0, 1.5, 0.5, 0.5, 1.5, 1.5, 1.5],
             pad_to=[192, 288], skip_connections=bool(args.skip_connections)))
         stage("load model", lambda: emulator.load(args.load_model))
+        import torch
+        if torch.cuda.is_available():
+            emulator.model = emulator.model.to("cuda")
+            log.info("model moved to GPU")
         log.info("fit SKIPPED — evaluating %s", args.load_model)
     else:
         set_seed(42)
