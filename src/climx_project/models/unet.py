@@ -391,6 +391,13 @@ class UNetEmulator(Emulator):
                                block_days=block_days, cache_blocks=cache_blocks)
         logger.info("cache dataset: train %d (step %d), val %d",
                     len(train_ds), step, len(val_ds))
+        if len(train_ds) == 0:
+            raise RuntimeError(
+                "empty training set — the day-index read from the cache "
+                "stores found no days in 2015-2100; check the store time "
+                "coordinates")
+        if len(val_ds) == 0:
+            raise RuntimeError("empty validation set — same time-coordinate problem")
 
         # num_workers=0 + block-local sampler: batches are served from ONE
         # 128-day block each (one zarr chunk read per store per batch),
