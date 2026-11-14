@@ -440,8 +440,10 @@ class UNetEmulator(Emulator):
         if stage_path.exists():
             shutil.rmtree(stage_path)
         first = True
-        for t0 in range(0, n_time, time_chunk):
+        n_chunks = (n_time + time_chunk - 1) // time_chunk
+        for ci, t0 in enumerate(range(0, n_time, time_chunk)):
             t1 = min(n_time, t0 + time_chunk)
+            logger.info("predict chunk %d/%d (days %d-%d)", ci + 1, n_chunks, t0, t1)
             # (feature, time, lat, lon) -> (time, feature, lat, lon): each day
             # is one batch element for the conv net.
             xb = (X.isel(time=slice(t0, t1)).to_array(dim="feature")

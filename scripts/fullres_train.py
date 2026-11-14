@@ -122,17 +122,28 @@ def main():
             SCALING_JSON.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(BUNDLED_SCALING, SCALING_JSON)
             MODE_MARKER.write_text("none")
-        stage("copy cache datasets to /tmp",
-              lambda: copy_datasets_to_cache(from_cache_dirs, CACHE_DIR,
-                                             only_scenarios=train_scenarios,
-                                             skip_x_test=True))
-        # X_test.nc stays on the mount (27 GB — the quota can't hold it):
-        # predict reads it directly from the extras dataset.
-        xt_path = next((Path(d) / "X_test.nc" for d in from_cache_dirs
-                        if (Path(d) / "X_test.nc").exists()), None)
-        if xt_path is None:
-            raise FileNotFoundError("X_test.nc not found in the attached datasets")
-        X_test = xr.open_dataset(xt_path, chunks={"time": 512, "lat": -1, "lon": -1})
+        if args.load_model:
+            # No fit: the scenario stores are unnecessary — skip them and
+            # copy X_test locally instead (the mount read made predict crawl
+            # at ~1-2 h; the local copy is ~18 min sequential).
+            stage("copy cache datasets to /tmp",
+                  lambda: copy_datasets_to_cache(from_cache_dirs, CACHE_DIR,
+                                                 only_scenarios=[],
+                                                 skip_x_test=False))
+            X_test = xr.open_dataset(CACHE_DIR / "X_test.nc",
+                                     chunks={"time": 256, "lat": -1, "lon": -1})
+        else:
+            stage("copy cache datasets to /tmp",
+                  lambda: copy_datasets_to_cache(from_cache_dirs, CACHE_DIR,
+                                                 only_scenarios=train_scenarios,
+                                                 skip_x_test=True))
+            # X_test.nc stays on the mount (27 GB — the quota can't hold it
+            # alongside the scenario stores): predict reads it directly.
+            xt_path = next((Path(d) / "X_test.nc" for d in from_cache_dirs
+                            if (Path(d) / "X_test.nc").exists()), None)
+            if xt_path is None:
+                raise FileNotFoundError("X_test.nc not found in the attached datasets")
+            X_test = xr.open_dataset(xt_path, chunks={"time": 256, "lat": -1, "lon": -1})
         metadata_test = _metadata_for()
         hist = open_hist_from_cache(CACHE_DIR)
         ds = None
