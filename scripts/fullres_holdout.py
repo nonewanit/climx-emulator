@@ -45,20 +45,36 @@ def find_mount_dirs():
     return [d for d in os.environ.get("CLIMX_CACHE_INPUT_DIRS", "").split(":") if d]
 
 
-def open_x_store(mounts, channel: str):
+def open_pkg_store(mounts, name: str, cache_dir: Path):
+    """Open <name>.zarr.zarrpkg from the mount — directly through zarr's
+    ZipStore (reads stream sequentially through the zip, no ~24 GB
+    extraction). Packages whose chunked writers omitted the root group
+    metadata fall back to extract+repair in cache_dir (the same repair
+    copy_datasets_to_cache does)."""
     for d in mounts:
-        p = Path(d) / f"X_{channel}_ssp370.zarr"
-        if p.is_dir():
-            return zarr.open_group(str(p), mode="r")
-    raise FileNotFoundError(f"X_{channel}_ssp370.zarr not found in {mounts}")
-
-
-def open_y_store(mounts, var: str):
-    for d in mounts:
-        p = Path(d) / f"y_{var}_ssp370.zarr"
-        if p.is_dir():
-            return zarr.open_group(str(p), mode="r")
-    raise FileNotFoundError(f"y_{var}_ssp370.zarr not found in {mounts}")
+        p = Path(d) / f"{name}.zarr.zarrpkg"
+        if not p.is_file():
+            continue
+        try:
+            return zarr.open_zip(str(p), mode="r")
+        except Exception:
+            pass  # missing root metadata or old zarr — extract below
+        dst = cache_dir / f"{name}.zarr"
+        if not (dst / "zarr.json").exists() and not (dst / ".zgroup").exists():
+            if dst.exists():
+                import shutil
+                shutil.rmtree(dst)
+            import zipfile
+            import json
+            log.info("extracting %s (root metadata missing in the package)",
+                     p.name)
+            with zipfile.ZipFile(p) as zf:
+                zf.extractall(dst)
+            if not (dst / "zarr.json").exists() and not (dst / ".zgroup").exists():
+                (dst / "zarr.json").write_text(json.dumps(
+                    {"zarr_format": 3, "node_type": "group", "attributes": {}}))
+        return zarr.open_group(str(dst), mode="r")
+    raise FileNotFoundError(f"{name}.zarr.zarrpkg not found in {mounts}")
 
 
 def main():
@@ -95,7 +111,9 @@ def main():
              feature_order, target_vars)
 
     # ---------- X from the cache stores (read from the mount) ----------
-    xg = {ch: open_x_store(mounts, ch) for ch in feature_order}
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    xg = {ch: open_pkg_store(mounts, f"X_{ch}_ssp370", CACHE_DIR)
+          for ch in feature_order}
     time_c = xg[feature_order[0]]["time"][:]
     # noleap calendar (365 days/year, stores start 2015-01-01): plain math
     i0 = (y0 - 2015) * 365
@@ -138,7 +156,7 @@ def main():
     gt_vars = {}
     lat = lon = None
     for var in INDEX_VARS:
-        g = open_y_store(mounts, var)
+        g = open_pkg_store(mounts, f"y_{var}_ssp370", CACHE_DIR)
         yv = g[var][i0:i1].astype(np.float32)
         if var in log_info:
             raw = 10 ** (yv * sc[var]["std"] + sc[var]["mean"]) - log_info[var]["epsilon"]
