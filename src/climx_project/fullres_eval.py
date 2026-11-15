@@ -26,6 +26,50 @@ AEROSOLS = ["BC_AX", "BC_N", "SO2", "SO4_PR", "OM_NI"]
 GHG = ["CO2_LBC", "N2O_LBC", "CH4_LBC", "CFC11eq_LBC", "CF2CL2_LBC"]
 
 
+def preprocess_chunk(monthly, yearly, m_float, y_float, day_float, time,
+                     t0: int, t1: int, feature_order, sc) -> np.ndarray:
+    """Eval-side chunk preprocessor — the exact input the model sees at
+    predict time for days [t0, t1). Shared by evaluate_pass1 and the
+    train/eval consistency check (scripts/check_preprocess.py), so any
+    change here changes what the submission predicts."""
+    def interp_to_days(src, src_float, day_float):
+        # vectorized linear interp: bracket each day between the two
+        # surrounding native time steps (searchsorted), no per-cell loop.
+        lo = np.clip(np.searchsorted(src_float, day_float, side="right") - 1,
+                     0, len(src_float) - 2)
+        denom = src_float[lo + 1] - src_float[lo]
+        w = np.where(denom > 0, (day_float - src_float[lo]) / denom, 0.0)
+        w = w.reshape(-1, *([1] * (src.ndim - 1)))
+        return src[lo] * (1 - w) + src[lo + 1] * w
+
+    first_src = (monthly or yearly)
+    src0 = next(iter(first_src.values()))
+    nlat, nlon = src0.shape[1:]
+    chunk_days = day_float[t0:t1]
+    X = np.empty((t1 - t0, len(feature_order), nlat, nlon), dtype=np.float32)
+    # aerosols: interp monthly -> chunk days (vectorized), log10, split
+    for i, v in enumerate(AEROSOLS):
+        if v in monthly:
+            d = interp_to_days(monthly[v], m_float, chunk_days)
+        else:
+            d = np.zeros((t1 - t0, nlat, nlon), np.float32)
+        d = np.sign(d) * np.log10(np.abs(d) + 1e-6)
+        X[:, feature_order.index(f"{v}_positive")] = np.where(d > 0, d, 0)
+        X[:, feature_order.index(f"{v}_negative")] = np.where(d < 0, -d, 0)
+        X[:, feature_order.index(f"{v}_zeros_mask")] = (d == 0).astype(np.float32)
+    # GHGs: interp yearly -> chunk days, standardize
+    for v in GHG:
+        if v in yearly:
+            d = interp_to_days(yearly[v], y_float, chunk_days)
+            X[:, feature_order.index(v)] = ((d - sc[v]["mean"]) / sc[v]["std"]).reshape(-1, 1, 1)
+    # seasonal
+    doy = np.asarray([(t - time[0]).days % 365 for t in time[t0:t1]])
+    phase = 2 * np.pi * doy / 365.25
+    X[:, feature_order.index("sin_doy")] = np.sin(phase)[:, None, None]
+    X[:, feature_order.index("cos_doy")] = np.cos(phase)[:, None, None]
+    return X
+
+
 # v2: fp16 clip + fp32 psl (old stores contain infs from the overflow casts).
 # v3: log cap 12 -> -3. Two downstream fp16 hazards made v2 stores fail the
 # finite check: (1) xclim's `pr * 86400` mm/day conversion casts the INT
@@ -78,16 +122,6 @@ def evaluate_pass1(emulator, raw_test: Path, metadata, pred_path: Path,
     monthly = {v: ds[v].isel(forcing_scenario=0).values for v in AEROSOLS if v in ds}
     yearly = {v: ds[v].isel(forcing_scenario=0).values for v in GHG if v in ds}
 
-    def interp_to_days(src, src_float, day_float):
-        # vectorized linear interp: bracket each day between the two
-        # surrounding native time steps (searchsorted), no per-cell loop.
-        lo = np.clip(np.searchsorted(src_float, day_float, side="right") - 1,
-                     0, len(src_float) - 2)
-        denom = src_float[lo + 1] - src_float[lo]
-        w = np.where(denom > 0, (day_float - src_float[lo]) / denom, 0.0)
-        w = w.reshape(-1, *([1] * (src.ndim - 1)))
-        return src[lo] * (1 - w) + src[lo + 1] * w
-
     stage_path = Path("/tmp/pred_stage.zarr")
     reuse_stage = stage_path.exists() and (stage_path / "zarr.json").exists()
     if reuse_stage:
@@ -115,26 +149,8 @@ def evaluate_pass1(emulator, raw_test: Path, metadata, pred_path: Path,
         t1 = min(n, t0 + time_chunk)
         log.info("predict chunk %d/%d (days %d-%d)", ci + 1, n_chunks, t0, t1)
         t_pre0 = _time.time()
-        chunk_days = day_float[t0:t1]
-        X = np.empty((t1 - t0, 22, len(lat), len(lon)), dtype=np.float32)
-        # aerosols: interp monthly -> chunk days (vectorized), log10, split
-        for i, v in enumerate(AEROSOLS):
-            d = interp_to_days(monthly[v], m_float, chunk_days) if v in monthly else np.zeros((t1 - t0, len(lat), len(lon)), np.float32)
-            d = np.sign(d) * np.log10(np.abs(d) + 1e-6)
-            X[:, feature_order.index(f"{v}_positive")] = np.where(d > 0, d, 0)
-            X[:, feature_order.index(f"{v}_negative")] = np.where(d < 0, -d, 0)
-            X[:, feature_order.index(f"{v}_zeros_mask")] = (d == 0).astype(np.float32)
-        # GHGs: interp yearly -> chunk days, standardize
-        for v in GHG:
-            if v in yearly:
-                d = interp_to_days(yearly[v], y_float, chunk_days)
-                X[:, feature_order.index(v)] = ((d - sc[v]["mean"]) / sc[v]["std"]).reshape(-1, 1, 1)
-        # seasonal
-        doy = np.asarray([(t - time[0]).days % 365 for t in time[t0:t1]])
-        phase = 2 * np.pi * doy / 365.25
-        X[:, feature_order.index("sin_doy")] = np.sin(phase)[:, None, None]
-        X[:, feature_order.index("cos_doy")] = np.cos(phase)[:, None, None]
-
+        X = preprocess_chunk(monthly, yearly, m_float, y_float, day_float,
+                             time, t0, t1, feature_order, sc)
         log.info("  chunk %d: preprocess %.1f s", ci + 1, _time.time() - t_pre0)
         t_fwd0 = _time.time()
         preds = []
