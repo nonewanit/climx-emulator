@@ -85,10 +85,29 @@ def log_scalar(logger_obj, key: str, value: float, step: int = 0) -> None:
         exp.log({key: value})
 
 
+def maybe_init_run(name: str, config: dict | None = None,
+                   project: str = "ClimX",
+                   entity: str | None = None):
+    """Lightweight W&B run for non-trainer scripts (diagnostics).
+
+    Cloud mode only: without WANDB_API_KEY this returns None — scripts
+    should not accumulate offline wandb/ dirs. Ends any run left active
+    from a previous %run in the same kernel.
+    """
+    if not os.environ.get("WANDB_API_KEY"):
+        return None
+    import wandb
+
+    if wandb.run is not None:
+        wandb.finish()
+    return wandb.init(project=project, entity=entity, name=name,
+                      config=config or {})
+
+
 def finish(logger_obj) -> None:
-    """Close the run (no-op when the logger is None)."""
+    """Close the run or trainer logger (no-op when None)."""
     if logger_obj is None:
         return
-    exp = logger_obj.experiment
+    exp = getattr(logger_obj, "experiment", logger_obj)
     if hasattr(exp, "finish"):
         exp.finish()

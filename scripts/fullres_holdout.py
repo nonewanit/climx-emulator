@@ -178,6 +178,19 @@ def main():
         log.info("  %-7s pred [%.4g, %.4g]  gt [%.4g, %.4g]",
                  name, pred_df[name].min(), pred_df[name].max(),
                  gt_df[name].min(), gt_df[name].max())
+    run = None
+    try:
+        from climx_project import monitoring
+        run = monitoring.maybe_init_run(
+            "holdout-ssp370", {"years": f"{y0}-{y1}",
+                               "model": str(args.model)})
+        if run is not None:
+            run.log({"local_nNSE": float(score)})
+            run.log({f"range/{name}": float(pred_df[name].mean())
+                     for name in gt_df.columns if name != "row_id"})
+            run.finish()
+    except Exception as e:  # wandb must never block the eval
+        log.warning("wandb log failed: %r", e)
 
 
 if __name__ == "__main__":

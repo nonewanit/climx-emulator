@@ -96,6 +96,15 @@ def main():
                          "evaluate with this model")
     ap.add_argument("--max-days", type=int, default=0,
                     help=">0 = smoke: truncate training days per scenario")
+    ap.add_argument("--logger", default="wandb",
+                    choices=("wandb", "tensorboard", "none"),
+                    help="training logger backend; wandb needs WANDB_API_KEY "
+                         "in the environment (Kaggle notebook Secret), and "
+                         "falls back to offline mode without it")
+    ap.add_argument("--wandb-project", default="ClimX")
+    ap.add_argument("--wandb-entity",
+                    default=os.environ.get("WANDB_ENTITY",
+                                           "nonewanit-tsinghua-university"))
     args = ap.parse_args()
 
     paths.ensure_dirs()
@@ -218,6 +227,24 @@ def main():
         hist = ds.hist
 
     # ---------- fit (shared) ----------
+    # Training logger (W&B cloud on Kaggle via the notebook Secret; offline
+    # fallback without a key). Built once here so fit() gets it either way.
+    train_logger = None
+    if args.logger != "none":
+        from climx_project import monitoring
+
+        class _LoggerCfg:
+            pass
+
+        cfg = _LoggerCfg()
+        cfg.backend = args.logger
+        cfg.project = args.wandb_project
+        cfg.entity = args.wandb_entity
+        cfg.name = f"fullres-unet-{','.join(train_scenarios)}-e{args.epochs}-b{args.batch}"
+        cfg.offline = False
+        train_logger = monitoring.build_logger(cfg)
+        log.info("training logger: %s", type(train_logger).__name__)
+
     if args.load_model:
         emulator = UNetEmulator(dict(
             n_in=22, n_out=7, base_channels=args.base_channels,
@@ -243,7 +270,7 @@ def main():
                 sample_step=1, scenarios=train_scenarios, max_days=args.max_days,
                 accelerator="auto", devices=1,
                 model_path="/tmp/full_unet_models",
-                logger=False)))
+                logger=train_logger if train_logger else False)))
         emulator.save("/tmp/full_unet.pt")
         # The scenario stores are dead weight after training — free the
         # storage quota before the evaluate.

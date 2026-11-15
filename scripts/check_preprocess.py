@@ -116,6 +116,14 @@ def main():
     log.info("feature order (%d): %s", len(feature_order), feature_order)
 
     ds = xr.open_dataset(RAW, engine="h5netcdf", chunks=CHUNKS)
+    run = None
+    try:
+        from climx_project import monitoring
+        run = monitoring.maybe_init_run(
+            "check-preprocess", {"years": args.years})
+    except Exception as e:  # wandb must never block the check
+        log.warning("wandb init failed: %r", e)
+
     all_ok = True
     for year in [int(y) for y in args.years.split(",")]:
         log.info("=== year %d ===", year)
@@ -137,9 +145,14 @@ def main():
                 ok_year = all_ok = False
             log.info("%-22s %s max|diff| = %.3e  (mean %.3e)",
                      name, flag, md, float(diff.mean()))
+            if run is not None:
+                run.log({f"diff/{name}": md})
         log.info("year %d: %s", year, "CONSISTENT" if ok_year else "MISMATCH")
     log.info("VERDICT: %s", "PASS — eval inputs match training inputs" if all_ok
              else "FAIL — a channel differs; the model sees shifted inputs")
+    if run is not None:
+        run.log({"verdict_pass": int(all_ok)})
+        run.finish()
 
 
 if __name__ == "__main__":
