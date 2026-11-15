@@ -116,7 +116,18 @@ class UNetModule(pl.LightningModule):
         return self._step(batch, "val")
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.hparams.learning_rate)
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.hparams.learning_rate)
+        # Constant-LR training plateaus well above what the model can reach
+        # (observed: val improvements shrank to ~0.01/epoch at epoch ~21 and
+        # the holdout nNSE stalled just below climatology). Halve the LR when
+        # val_loss stalls for 4 epochs.
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer, mode="min", factor=0.5, patience=4, min_lr=1e-6)
+        return {"optimizer": optimizer,
+                "lr_scheduler": {"scheduler": scheduler,
+                                 "monitor": "val_loss",
+                                 "interval": "epoch",
+                                 "frequency": 1}}
 
 
 class _ArrayDataset(Dataset):
@@ -319,55 +330,16 @@ class UNetEmulator(Emulator):
         self._train(train_dl, val_dl, tp)
 
     def _train(self, train_dl, val_dl, tp):
-        """Shared trainer plumbing: callback setup, fit, best-checkpoint load."""
-        trainer_kwargs = {k: v for k, v in tp.items()
-                          if k not in ("batch_size", "num_workers",
-                                       "model_path", "max_days",
-                                       "early_stop_patience",
-                                       "checkpoint_every",
-                                       "scenarios", "sample_step",
-                                       "block_days", "cache_blocks")}
-        trainer_kwargs.setdefault("logger", False)
-        model_path = Path(tp.get("model_path", "results/models/unet"))
-        model_path.mkdir(parents=True, exist_ok=True)
-        trainer_kwargs.setdefault("default_root_dir", str(model_path))
+        """Shared trainer plumbing: callback setup, fit, best-checkpoint load.
 
-        from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
-        callbacks = trainer_kwargs.get("callbacks", [])
-        # KEEP THIS FIRST: trainer.checkpoint_callback returns the first in
-        # the list, and the post-fit load uses it for the best-val weights.
-        callbacks.append(ModelCheckpoint(
-            # val_loss is logged with on_step=False, on_epoch=True -> the key
-            # itself holds the epoch aggregate (no "_epoch" suffix for val).
-            monitor="val_loss", mode="min", save_top_k=1, save_last=True,
-            dirpath=str(model_path), filename="best-{epoch:02d}-{val_loss:.4f}",
-        ))
-        # Periodic snapshots (epoch-05.ckpt, epoch-10.ckpt, ...) so a crash or
-        # an over-eager early stop never loses the whole run.
-        checkpoint_every = int(tp.get("checkpoint_every", 5))
-        if checkpoint_every > 0:
-            callbacks.append(ModelCheckpoint(
-                every_n_epochs=checkpoint_every, save_top_k=-1, save_last=False,
-                dirpath=str(model_path), filename="epoch-{epoch:02d}",
-            ))
-        # Self-regulating long runs: stop when validation loss plateaus, so
-        # max_epochs can be set generously without wasting GPU time.
-        callbacks.append(EarlyStopping(
-            monitor="val_loss", mode="min",
-            patience=int(tp.get("early_stop_patience", 3)), min_delta=1e-4,
-            verbose=True, check_on_train_epoch_end=False,
-        ))
-        trainer_kwargs["callbacks"] = callbacks
+        Implementation lives in models/train_utils.py so the world model gets
+        the identical checkpoint/early-stop policy.
+        """
+        from .train_utils import run_trainer
 
-        self.trainer = pl.Trainer(**trainer_kwargs)
-        self.trainer.fit(self.model, train_dl, val_dl)
-
-        # Evaluate with the BEST-val weights, not the last epoch's — val loss
-        # fluctuates at this scale and last != best.
-        best = getattr(self.trainer.checkpoint_callback, "best_model_path", None)
-        if best:
-            self.model = UNetModule.load_from_checkpoint(best)
-            logger.info("Loaded best-val checkpoint for evaluation: %s", best)
+        self.model = run_trainer(self.model,
+                                 lambda ckpt: UNetModule.load_from_checkpoint(ckpt),
+                                 train_dl, val_dl, tp)
 
     def _fit_cached(self, cache_dir: Path, trainer_params):
         """Train from the fp16 scenario cache (scripts/full_cache.py output).
