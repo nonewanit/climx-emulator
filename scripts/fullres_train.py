@@ -254,7 +254,32 @@ def main():
             learning_rate=args.learning_rate,
             variable_weights=[1.0, 1.5, 0.5, 0.5, 1.5, 1.5, 1.5],
             pad_to=[192, 288], skip_connections=bool(args.skip_connections)))
-        stage("load model", lambda: emulator.load(args.load_model))
+        if str(args.load_model).endswith(".ckpt"):
+            # Lightning periodic/best snapshot — different format from
+            # emulator.save's .pt. Rebuild the channel order from the mount
+            # packages (or the unpacked stores when the fit ran here).
+            from climx_project.models.unet import (TARGET_VARIABLE_ORDER,
+                                                   UNetModule)
+            emulator.model = UNetModule.load_from_checkpoint(args.load_model)
+            names = None
+            for d in from_cache_dirs:
+                pkgs = sorted(Path(d).glob("X_*_ssp370.zarr.zarrpkg"))
+                if pkgs:
+                    names = [p.name.split("_", 1)[1].rsplit("_", 1)[0]
+                             for p in pkgs]
+                    break
+            if not names:
+                names = [p.name.split("_", 1)[1].rsplit("_", 1)[0]
+                         for p in sorted(CACHE_DIR.glob("X_*_ssp370.zarr"))]
+            if not names:
+                raise FileNotFoundError(
+                    "cannot derive the channel order for this ckpt — no "
+                    "X_*_ssp370 stores in the mounts or CACHE_DIR")
+            emulator.feature_vars = names
+            emulator.target_vars = list(TARGET_VARIABLE_ORDER)
+            log.info("loaded ckpt with feature_vars=%s", names)
+        else:
+            stage("load model", lambda: emulator.load(args.load_model))
         import torch
         if torch.cuda.is_available():
             emulator.model = emulator.model.to("cuda")
