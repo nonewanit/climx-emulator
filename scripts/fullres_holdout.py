@@ -175,10 +175,10 @@ def main():
     lat = lon = None
     for var in INDEX_VARS:
         g = open_pkg_store(mounts, f"y_{var}_ssp370", CACHE_DIR)
-        if len(g["time"]) < i1:
+        if g["time"].shape[0] < i1:
             raise ValueError(
-                f"y_{var}_ssp370 has {len(g['time'])} days — shorter than "
-                f"the X span ({i1}); the stores are misaligned")
+                f"y_{var}_ssp370 has {g['time'].shape[0]} days — shorter "
+                f"than the X span ({i1}); the stores are misaligned")
         yv = g[var][i0:i1].astype(np.float32)
         if var in log_info:
             raw = 10 ** (yv * sc[var]["std"] + sc[var]["mean"]) - log_info[var]["epsilon"]
