@@ -77,6 +77,24 @@ def open_pkg_store(mounts, name: str, cache_dir: Path):
     raise FileNotFoundError(f"{name}.zarr.zarrpkg not found in {mounts}")
 
 
+def read_time_coord(g):
+    """Decode the store's raw time array back to a CFTimeIndex (the
+    cachebuilder's to_zarr wrote it with CF units/calendar attrs; reading
+    it raw gives undecoded ints that break xclim's resample)."""
+    from xarray.coding.times import decode_cf_datetime
+
+    t = g["time"]
+    vals = np.asarray(t[:])
+    units = t.attrs.get("units")
+    if units is None:
+        raise ValueError(f"time array has no CF units attr (attrs={dict(t.attrs)})")
+    calendar = t.attrs.get("calendar", "standard")
+    idx = xr.CFTimeIndex(decode_cf_datetime(vals, units=units,
+                                            calendar=calendar,
+                                            use_cftime=True))
+    return idx
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default=str(MODEL))
@@ -114,7 +132,7 @@ def main():
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     xg = {ch: open_pkg_store(mounts, f"X_{ch}_ssp370", CACHE_DIR)
           for ch in feature_order}
-    time_c = xg[feature_order[0]]["time"][:]
+    time_c = read_time_coord(xg[feature_order[0]])
     # noleap calendar (365 days/year, stores start 2015-01-01): plain math
     i0 = (y0 - 2015) * 365
     i1 = min((y1 + 1 - 2015) * 365, len(time_c))
@@ -157,6 +175,10 @@ def main():
     lat = lon = None
     for var in INDEX_VARS:
         g = open_pkg_store(mounts, f"y_{var}_ssp370", CACHE_DIR)
+        if len(g["time"]) < i1:
+            raise ValueError(
+                f"y_{var}_ssp370 has {len(g['time'])} days — shorter than "
+                f"the X span ({i1}); the stores are misaligned")
         yv = g[var][i0:i1].astype(np.float32)
         if var in log_info:
             raw = 10 ** (yv * sc[var]["std"] + sc[var]["mean"]) - log_info[var]["epsilon"]
