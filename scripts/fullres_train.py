@@ -96,6 +96,9 @@ def main():
                          "evaluate with this model")
     ap.add_argument("--max-days", type=int, default=0,
                     help=">0 = smoke: truncate training days per scenario")
+    ap.add_argument("--patience", type=int, default=8,
+                    help="early-stopping patience on val_loss (the default 3 "
+                         "stops long runs before the variance opens up)")
     ap.add_argument("--logger", default="wandb",
                     choices=("wandb", "tensorboard", "none"),
                     help="training logger backend; wandb needs WANDB_API_KEY "
@@ -268,6 +271,7 @@ def main():
             CACHE_DIR, None, trainer_params=dict(
                 max_epochs=args.epochs, batch_size=args.batch, num_workers=2,
                 sample_step=1, scenarios=train_scenarios, max_days=args.max_days,
+                early_stop_patience=args.patience,
                 accelerator="auto", devices=1,
                 model_path="/tmp/full_unet_models",
                 logger=train_logger if train_logger else False)))
