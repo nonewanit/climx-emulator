@@ -118,7 +118,27 @@ def main():
         n_in=22, n_out=7, base_channels=64, learning_rate=1e-3,
         variable_weights=[1.0, 1.5, 0.5, 0.5, 1.5, 1.5, 1.5],
         pad_to=[192, 288], skip_connections=True))
-    emulator.load(args.model)
+    if str(args.model).endswith(".ckpt"):
+        # Lightning periodic snapshot (epoch-NN.ckpt) — a different format
+        # from emulator.save's full_unet.pt. Rebuild the channel order from
+        # the cache package names, exactly like the cache fit does.
+        from climx_project.models.unet import UNetModule, TARGET_VARIABLE_ORDER
+        emulator.model = UNetModule.load_from_checkpoint(args.model)
+        names = None
+        for d in mounts:
+            pkgs = sorted(Path(d).glob("X_*_ssp370.zarr.zarrpkg"))
+            if pkgs:
+                names = [p.name.split("_", 1)[1].rsplit("_", 1)[0]
+                         for p in pkgs]
+                break
+        if not names:
+            raise FileNotFoundError(
+                "no X_*_ssp370.zarr.zarrpkg packages in the mounts — cannot "
+                "derive the channel order for this checkpoint")
+        emulator.feature_vars = names
+        emulator.target_vars = list(TARGET_VARIABLE_ORDER)
+    else:
+        emulator.load(args.model)
     import torch
     device = "cuda" if torch.cuda.is_available() else "cpu"
     emulator.model = emulator.model.to(device)
