@@ -324,6 +324,7 @@ class UNetEmulator(Emulator):
                           if k not in ("batch_size", "num_workers",
                                        "model_path", "max_days",
                                        "early_stop_patience",
+                                       "checkpoint_every",
                                        "scenarios", "sample_step",
                                        "block_days", "cache_blocks")}
         trainer_kwargs.setdefault("logger", False)
@@ -333,12 +334,22 @@ class UNetEmulator(Emulator):
 
         from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
         callbacks = trainer_kwargs.get("callbacks", [])
+        # KEEP THIS FIRST: trainer.checkpoint_callback returns the first in
+        # the list, and the post-fit load uses it for the best-val weights.
         callbacks.append(ModelCheckpoint(
             # val_loss is logged with on_step=False, on_epoch=True -> the key
             # itself holds the epoch aggregate (no "_epoch" suffix for val).
             monitor="val_loss", mode="min", save_top_k=1, save_last=True,
             dirpath=str(model_path), filename="best-{epoch:02d}-{val_loss:.4f}",
         ))
+        # Periodic snapshots (epoch-05.ckpt, epoch-10.ckpt, ...) so a crash or
+        # an over-eager early stop never loses the whole run.
+        checkpoint_every = int(tp.get("checkpoint_every", 5))
+        if checkpoint_every > 0:
+            callbacks.append(ModelCheckpoint(
+                every_n_epochs=checkpoint_every, save_top_k=-1, save_last=False,
+                dirpath=str(model_path), filename="epoch-{epoch:02d}",
+            ))
         # Self-regulating long runs: stop when validation loss plateaus, so
         # max_epochs can be set generously without wasting GPU time.
         callbacks.append(EarlyStopping(
