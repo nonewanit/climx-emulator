@@ -85,16 +85,29 @@ def _percentile_doy_numpy(vals: np.ndarray, doys: np.ndarray, per: float,
     return out
 
 
+_THRESHOLD_CACHE: dict = {}
+
+
 def percentile_threshold_numpy(hist, var: str, per: float,
                                base_period, window: int = 5) -> np.ndarray:
-    """(365, lat, lon) threshold from the hist dataset, in the hist dtype."""
+    """(365, lat, lon) threshold from the hist dataset, in the hist dtype.
+
+    Cached per (hist object, var, percentile): the holdout runs the same
+    indices twice (pred + GT) against the same hist, and each threshold
+    costs a 2.4 GB read + 365 per-doy quantiles — the cache halves that.
+    """
+    key = (id(hist), var, per, base_period, window)
+    if key in _THRESHOLD_CACHE:
+        return _THRESHOLD_CACHE[key]
     da = hist[var]
     if base_period:
         da = da.sel(time=slice(base_period[0], base_period[1]))
     # the lite hist carries a size-1 forcing_scenario dim; squeeze it away
     vals = np.squeeze(np.asarray(da.values))
     doys = np.asarray(da.time.dt.dayofyear.values, dtype=np.int64)
-    return _percentile_doy_numpy(vals, doys, per, window)
+    thr = _percentile_doy_numpy(vals, doys, per, window)
+    _THRESHOLD_CACHE[key] = thr
+    return thr
 
 
 # --------------------------------------------------------------- run counts
