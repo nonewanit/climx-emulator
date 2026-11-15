@@ -73,7 +73,18 @@ def starter_side(ds: xr.Dataset, year: int, sc: dict) -> dict:
     phase = 2 * np.pi * x.time.dt.dayofyear / 365.25
     x["sin_doy"] = np.sin(phase).expand_dims(lat=x.lat, lon=x.lon)
     x["cos_doy"] = np.cos(phase).expand_dims(lat=x.lat, lon=x.lon)
-    return {k: np.asarray(x[k].values, dtype=np.float32) for k in x.data_vars}
+    x["sin_doy"] = x["sin_doy"].transpose(..., "time", "lat", "lon")
+    x["cos_doy"] = x["cos_doy"].transpose(..., "time", "lat", "lon")
+    out = {}
+    for k in x.data_vars:
+        a = np.asarray(x[k].values, dtype=np.float32)
+        # 1D GHG channels: write_cache_x broadcasts them to the grid — the
+        # eval-side preprocessor already produces the broadcast shape.
+        if a.ndim == 1:
+            a = np.broadcast_to(a[:, None, None],
+                                (a.shape[0], x.sizes["lat"], x.sizes["lon"]))
+        out[k] = a
+    return out
 
 
 def eval_side(ds: xr.Dataset, year: int, feature_order, sc) -> np.ndarray:
