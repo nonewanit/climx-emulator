@@ -62,8 +62,11 @@ def preprocess_chunk(monthly, yearly, m_float, y_float, day_float, time,
         if v in yearly:
             d = interp_to_days(yearly[v], y_float, chunk_days)
             X[:, feature_order.index(v)] = ((d - sc[v]["mean"]) / sc[v]["std"]).reshape(-1, 1, 1)
-    # seasonal
-    doy = np.asarray([(t - time[0]).days % 365 for t in time[t0:t1]])
+    # seasonal — day-of-year is 1-BASED, matching the starter's
+    # preprocess_train (2*pi*time.dt.dayofyear/365.25). The 0-based
+    # days%%365 shifted the phase by 2*pi/365.25 (max|diff| 1.72e-2 on the
+    # sin/cos channels — caught by scripts/check_preprocess.py).
+    doy = np.asarray([(t - time[0]).days % 365 + 1 for t in time[t0:t1]])
     phase = 2 * np.pi * doy / 365.25
     X[:, feature_order.index("sin_doy")] = np.sin(phase)[:, None, None]
     X[:, feature_order.index("cos_doy")] = np.cos(phase)[:, None, None]
@@ -77,7 +80,9 @@ def preprocess_chunk(monthly, yearly, m_float, y_float, day_float, time,
 # went inf (fixed separately in compat via a fp32 upcast); (2) pathological
 # cells clipped to 65504 would still overflow the rolling/annual sums. The
 # -3 cap (86.4 mm/day) keeps every downstream fp16 op finite on its own.
-REVERSAL_VERSION = "3"
+# v4: seasonal channels 1-based day-of-year (the 0-based days%%365 shifted
+# the phase by 2*pi/365.25 vs the training inputs — check_preprocess).
+REVERSAL_VERSION = "4"
 
 
 def _reversal_marker(pred_path: Path) -> Path:
