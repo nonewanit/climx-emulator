@@ -92,8 +92,16 @@ def main():
                          "storage quota ~57.6 GiB can't hold the full x1 cache "
                          "- one scenario ~24 GB + hist ~11 GB fits)")
     ap.add_argument("--load-model", default=None,
-                    help="path to a saved full_unet.pt — skip the fit and "
-                         "evaluate with this model")
+                    help="path to a saved full_unet.pt or Lightning .ckpt — "
+                         "skip the fit and evaluate with this model")
+    ap.add_argument("--finetune", action="store_true",
+                    help="with --load-model: CONTINUE training the loaded "
+                         "weights on --scenarios (multi-scenario curriculum "
+                         "across sessions: ssp370 -> ssp126 -> ssp585)")
+    ap.add_argument("--skip-evaluate", action="store_true",
+                    help="fit-only: skip the ~2.5h 86-year evaluate + "
+                         "submission build (for curriculum sessions; "
+                         "evaluate in the final session)")
     ap.add_argument("--max-days", type=int, default=0,
                     help=">0 = smoke: truncate training days per scenario")
     ap.add_argument("--patience", type=int, default=8,
@@ -139,7 +147,7 @@ def main():
         # hist packages are NOT copied: the 86-year submission makes the
         # preprocessed X_test ~152 GB, so the forcings are transformed
         # lazily per predict chunk instead.
-        if args.load_model:
+        if args.load_model and not args.finetune:
             stage("copy cache datasets to /tmp",
                   lambda: copy_datasets_to_cache(from_cache_dirs, CACHE_DIR,
                                                  only_scenarios=[],
@@ -284,7 +292,11 @@ def main():
         if torch.cuda.is_available():
             emulator.model = emulator.model.to("cuda")
             log.info("model moved to GPU")
-        log.info("fit SKIPPED — evaluating %s", args.load_model)
+        if args.finetune:
+            log.info("FINETUNE: continuing %s on %s", args.load_model,
+                     train_scenarios)
+        else:
+            log.info("fit SKIPPED — evaluating %s", args.load_model)
     else:
         set_seed(42)
         emulator = UNetEmulator(dict(
@@ -292,6 +304,8 @@ def main():
             learning_rate=args.learning_rate,
             variable_weights=[1.0, 1.5, 0.5, 0.5, 1.5, 1.5, 1.5],
             pad_to=[192, 288], skip_connections=bool(args.skip_connections)))
+    if not args.load_model or args.finetune:
+        set_seed(42)
         stage("fit (cache, 192x288)", lambda: emulator.fit(
             CACHE_DIR, None, trainer_params=dict(
                 max_epochs=args.epochs, batch_size=args.batch, num_workers=2,
@@ -312,6 +326,12 @@ def main():
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
+
+    if args.skip_evaluate:
+        log.info("SKIP_EVALUATE — model saved (/tmp/full_unet.pt + "
+                 "/tmp/full_unet_models checkpoints); evaluate in a later "
+                 "session with --load-model (no --finetune)")
+        return
 
     # ---------- evaluate (86-year submission) ----------
     # The submission wants the indices over the FULL 2015-2100 span
