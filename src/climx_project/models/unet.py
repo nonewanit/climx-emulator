@@ -52,7 +52,8 @@ class DoubleConv(nn.Module):
 class UNetModule(pl.LightningModule):
     def __init__(self, n_in=22, n_out=7, base_channels=64,
                  variable_weights=None, learning_rate=1e-3, pad_to=(16, 32),
-                 skip_connections=True, cell_weights=None):
+                 skip_connections=True, cell_weights=None, forcing_head=False,
+                 forcing_mlp_hidden=128, scalar_channels=None):
         super().__init__()
         self.save_hyperparameters()
         b = base_channels
@@ -68,6 +69,26 @@ class UNetModule(pl.LightningModule):
         self.register_buffer("cell_weights",
                              None if cell_weights is None
                              else torch.as_tensor(cell_weights, dtype=torch.float32))
+        # Forcing head (FiLM-style): the broadcast scalar channels (5 GHG +
+        # seasonal encodings) are a WEAK signal path for conv layers — the
+        # trend diagnostics showed the models under-react (lite 0.73) or
+        # anti-react (fullres -0.19) to the greenhouse forcing. The head
+        # encodes the scalars with an MLP and modulates the bottleneck
+        # features directly: scale + shift per channel. `scalar_channels`
+        # holds the input-channel indices of the spatially-constant channels
+        # (derived from the data at fit time — the lite and fullres channel
+        # orders differ).
+        self.forcing_head = bool(forcing_head)
+        self.scalar_channels = list(scalar_channels or [])
+        if self.forcing_head and self.scalar_channels:
+            # The runner constructs the module BEFORE fit() derives the
+            # scalar channel indices from the data, so the MLP is created
+            # only when the indices are known (fit() rebuilds the module).
+            self.forcing_mlp = nn.Sequential(
+                nn.Linear(len(self.scalar_channels), forcing_mlp_hidden),
+                nn.ReLU(inplace=True),
+                nn.Linear(forcing_mlp_hidden, 8 * b),  # 4b scale + 4b shift
+            )
 
         self.enc1 = DoubleConv(n_in, b)
         self.enc2 = DoubleConv(b, 2 * b)
@@ -99,6 +120,13 @@ class UNetModule(pl.LightningModule):
         e1 = self.enc1(x)
         e2 = self.enc2(self.pool(e1))
         b = self.bottleneck(self.pool(e2))
+        if self.forcing_head:
+            if not self.scalar_channels or not hasattr(self, "forcing_mlp"):
+                raise RuntimeError("forcing_head enabled without scalar "
+                                   "channels — fit() must rebuild the module")
+            scalars = x[:, self.scalar_channels, 0, 0]   # (B, n_scalar)
+            scale, shift = self.forcing_mlp(scalars).chunk(2, dim=1)
+            b = b * scale[:, :, None, None] + shift[:, :, None, None]
         d1_in = torch.cat([self.up1(b), e2], dim=1) if self.skip else self.up1(b)
         d1 = self.dec1(d1_in)
         d2_in = torch.cat([self.up2(d1), e1], dim=1) if self.skip else self.up2(d1)
@@ -307,6 +335,21 @@ class UNetEmulator(Emulator):
             model_path.mkdir(parents=True, exist_ok=True)
             np.save(model_path / "metric_weights.npy", w)
             self.model_params = dict(self.model_params, cell_weights=w)
+            self.model = UNetModule(**self.model_params)
+
+        # Forcing head (A/B arm B of the trend fix): the head encodes the
+        # GREENHOUSE-GAS scalar channels. The GHG vars are the only ones
+        # stored 2D (scenario, time) in the nc — xarray broadcasts them at
+        # to_array time — and their indices differ between the lite and
+        # fullres channel orders, so derive them from the data, never
+        # hardcode.
+        if self.model_params.get("forcing_head"):
+            const = [i for i, v in enumerate(self.feature_vars)
+                     if X_train[v].ndim == 2]
+            logger.info("forcing_head: scalar channels %s",
+                        [self.feature_vars[i] for i in const])
+            self.model_params = dict(self.model_params, forcing_head=True,
+                                     scalar_channels=const)
             self.model = UNetModule(**self.model_params)
 
         # Same split convention as the starter's NN (projections only, all

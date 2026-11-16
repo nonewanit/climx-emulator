@@ -21,6 +21,12 @@ model:
     # 216-pixel grid. Use false on lite; set true for the full-res grid
     # (192x288) where fine spatial detail exists.
     skip_connections: false
+    # Forcing head (FiLM): MLP over the 5 GHG scalar channels modulating the
+    # bottleneck — the fix for the damped/broken GHG response (lite trend
+    # ratio 0.73, fullres -0.19). A/B via
+    # experiment.model.model_params.forcing_head=true; the scalar channels
+    # are derived from the data at fit time (2D-stored vars).
+    forcing_head: false
 trainer:
   max_epochs: 5
   batch_size: 64
