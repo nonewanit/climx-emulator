@@ -13,6 +13,7 @@ fluctuates at this scale and last != best.
 """
 
 import logging
+import sys
 from pathlib import Path
 
 import pytorch_lightning as pl
@@ -36,6 +37,15 @@ def run_trainer(model: pl.LightningModule, load_fn, train_dl, val_dl, tp: dict):
     """
     trainer_kwargs = {k: v for k, v in tp.items() if k not in NON_TRAINER_KEYS}
     trainer_kwargs.setdefault("logger", False)
+    # Lightning's TQDMProgressBar rewrites its line with \r on every refresh;
+    # a notebook's captured `!python train.py` output renders each refresh as
+    # a NEW line (hundreds of val-bar lines per epoch). In a real terminal
+    # \r works, so keep the bars; anywhere stdout is not a tty (notebook
+    # subprocess, redirected logs), disable them and rely on the one-line
+    # per-epoch EarlyStopping log + W&B curves. An explicit
+    # `trainer.enable_progress_bar=true|false` config value wins (setdefault).
+    if not sys.stdout.isatty():
+        trainer_kwargs.setdefault("enable_progress_bar", False)
     model_path = Path(tp.get("model_path", "results/models/model"))
     model_path.mkdir(parents=True, exist_ok=True)
     trainer_kwargs.setdefault("default_root_dir", str(model_path))

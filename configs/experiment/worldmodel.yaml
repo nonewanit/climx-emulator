@@ -39,6 +39,9 @@ trainer:
   early_stop_patience: 5   # EarlyStopping on val_loss (teacher-forced —
                            # comparable with the unet's val_loss)
   checkpoint_every: 5      # periodic epoch snapshots next to the best-val ckpt
+  # Lightning progress bars are auto-disabled when stdout is not a tty
+  # (notebook `!python ...` subprocess). Force with
+  # experiment.trainer.enable_progress_bar=true|false.
 
 logger:
   backend: wandb
