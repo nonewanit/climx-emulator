@@ -549,7 +549,9 @@ class WorldModelEmulator(Emulator):
         }, path)
 
     def load(self, path):
-        ckpt = torch.load(path, map_location="cpu")
+        # weights_only=False: the dict holds model_params + feature/target
+        # var lists, not just tensors (torch>=2.6 defaults weights_only=True).
+        ckpt = torch.load(path, map_location="cpu", weights_only=False)
         self.model_params = ckpt["model_params"]
         self.model = WorldModelModule(**self.model_params)
         self.model.load_state_dict(ckpt["model_state"])

@@ -449,12 +449,16 @@ class UNetEmulator(Emulator):
         # reversal then copied it (~25 GB peak) — the kernel was OOM-killed.
         # The lazy path keeps the peak at ~2 GB and the starter's reversal
         # and to_zarr run chunk-wise.
-        import shutil
+        import tempfile
         from climx_project.cacheio import zarr_fp16_encoding
         stage_enc = zarr_fp16_encoding()
-        stage_path = Path("/tmp/pred_stage.zarr")
-        if stage_path.exists():
-            shutil.rmtree(stage_path)
+        # Per-process staging dir. Concurrent runs (a notebook training cell
+        # executed twice) used to share /tmp/pred_stage.zarr: one run's
+        # rmtree + append corrupted the other's store mid-write (observed:
+        # the time axis doubled to ~2x31389 days and to_zarr then raised
+        # "would overlap multiple Dask chunks"). mkdtemp makes collisions
+        # impossible; leftovers die with /tmp at session end.
+        stage_path = Path(tempfile.mkdtemp(prefix="pred_stage_")) / "pred.zarr"
         first = True
         n_chunks = (n_time + time_chunk - 1) // time_chunk
         for ci, t0 in enumerate(range(0, n_time, time_chunk)):
@@ -491,6 +495,21 @@ class UNetEmulator(Emulator):
             del pred, ds_chunk
         return xr.open_zarr(stage_path, chunks={"time": 365})
 
+    @classmethod
+    def from_checkpoint(cls, ckpt_path, *, feature_vars, target_vars=None):
+        """Build an emulator around a Lightning checkpoint (best-val weights).
+
+        Lightning checkpoints don't carry the data-derived feature order —
+        pass it (list(X_train.data_vars)) so predict() selects the right
+        channels. target_vars defaults to the standard 7-variable order.
+        """
+        module = UNetModule.load_from_checkpoint(str(ckpt_path))
+        em = cls(dict(module.hparams))
+        em.model = module
+        em.feature_vars = list(feature_vars)
+        em.target_vars = list(target_vars or TARGET_VARIABLE_ORDER)
+        return em
+
     def save(self, path):
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         torch.save({
@@ -501,7 +520,9 @@ class UNetEmulator(Emulator):
         }, path)
 
     def load(self, path):
-        ckpt = torch.load(path, map_location="cpu")
+        # weights_only=False: the dict holds model_params + feature/target
+        # var lists, not just tensors (torch>=2.6 defaults weights_only=True).
+        ckpt = torch.load(path, map_location="cpu", weights_only=False)
         self.model_params = ckpt["model_params"]
         self.model = UNetModule(**self.model_params)
         self.model.load_state_dict(ckpt["model_state"])

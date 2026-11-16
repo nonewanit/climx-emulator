@@ -1,7 +1,7 @@
 # One command per pipeline stage. Run everything from the repo root with the
 # `climx` conda env active.
 
-.PHONY: data preprocess climatology lps ffnn worldmodel all verify submit
+.PHONY: data preprocess climatology lps ffnn worldmodel holdout all verify submit
 
 # Download the Kaggle bundle and map it into data/lite/
 data:
@@ -24,6 +24,11 @@ ffnn:
 
 worldmodel:
 	@python train.py experiment=worldmodel
+
+# Re-score a saved model on the SSP370 holdout without retraining:
+# make holdout MODEL=unet [CKPT=results/models/unet/best-epoch=01.ckpt]
+holdout:
+	@python -m climx_project.holdout $(MODEL) $(if $(CKPT),--checkpoint $(CKPT),)
 
 all: climatology lps ffnn
 
