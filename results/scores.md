@@ -7,3 +7,4 @@
 | 2026-11-07 | unet | -0.4340 | submission_unet.parquet | - | edeb04d (20 epochs, early stop) |
 | 2026-11-07 | unet (skips ON) | -0.4348 | - | - | 44421a9 (A/B arm A) |
 | 2026-11-07 | unet (skips OFF) | -0.4289 | submission_unet.parquet | - | 44421a9 (A/B arm B — best lite U-Net) |
+| 2026-11-16 | unet (metric weights) | -0.4415 | - | - | bbbafc4 (scorer-derived loss — negative on lite; confounded by LR + sync_dist) |
