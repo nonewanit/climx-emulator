@@ -1,0 +1,50 @@
+# World-model emulator (Phase C). Same U-Net encoder-decoder scale as the
+# unet config, plus a tau-day window of past states fused through a ConvLSTM
+# at the encoder bottleneck. Training is teacher-forced; predict() rolls out
+# autoregressively from the learned missing-history prior. pad_to [16, 32]
+# pads the 12x18 lite grid; on the full grid use [192, 288].
+name: worldmodel
+runner:
+  _target_: climx_project.runners.worldmodel.run
+seed: 42
+model:
+  _target_: climx_project.models.worldmodel.WorldModelEmulator
+  model_params:
+    n_in: 22
+    n_out: 7
+    base_channels: 64
+    tau: 7                # days of past states conditioning the next day
+    learning_rate: 0.001
+    # huss, pr, psl, sfcWind, tas, tasmax, tasmin — indices use tas*/pr
+    variable_weights: [1.0, 1.5, 0.5, 0.5, 1.5, 1.5, 1.5]
+    pad_to: [16, 32]
+    # LITE A/B verdict (unet, 2026-11-07): skips OFF on the 216-pixel grid.
+    # Skips here come from the FORCING encoder only; state info flows through
+    # the ConvLSTM bottleneck.
+    skip_connections: false
+    history_mask_prob: 0.1  # fraction of training windows replaced by the
+                            # learned missing-history prior — what inference
+                            # sees during the first tau days of a rollout
+    scheduled_sampling: 0.0  # fraction of batches whose window is a rollout
+                             # of the model's OWN predictions (stability
+                             # regularizer; try 0.1-0.3 once v0 trains)
+trainer:
+  max_epochs: 20
+  batch_size: 64
+  num_workers: 2     # Kaggle GPU: 2; local CPU smoke: override to 0
+  accelerator: auto  # picks the GPU on Kaggle/Colab, CPU locally
+  max_days: 0        # >0 = train on the first N days per scenario only.
+                     # Use for LOCAL smoke runs — the full arrays (~1.8 GB)
+                     # destabilize this 7.5 GB WSL machine.
+  early_stop_patience: 5   # EarlyStopping on val_loss (teacher-forced —
+                           # comparable with the unet's val_loss)
+  checkpoint_every: 5      # periodic epoch snapshots next to the best-val ckpt
+
+logger:
+  backend: wandb
+  project: ClimX     # same project as the full-res runs
+  name: worldmodel-lite
+  log_model: all     # upload every checkpoint as a W&B artifact on the run page
+
+record: true
+model_dir: null   # null -> results/models/worldmodel (runner default)

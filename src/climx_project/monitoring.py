@@ -68,10 +68,17 @@ def _build_wandb(cfg_logger: Any, name):
 
     project = getattr(cfg_logger, "project", "climx-lite")
     entity = getattr(cfg_logger, "entity", None) or None
+    # log_model: True/'all' uploads every checkpoint as a W&B artifact on the
+    # run page (cloud mode) — the Kaggle-notebook runs rely on this to keep
+    # checkpoints after /kaggle/working is destroyed.
+    log_model = getattr(cfg_logger, "log_model", None)
+    if log_model not in (True, "all", "best", "last"):
+        log_model = None
     # Hydra chdirs into per-run dirs; keep W&B artifacts in one stable,
     # gitignored location (results/runs/wandb/) instead of scattering them.
     save_dir = str(paths.RUNS_DIR)
-    return WandbLogger(project=project, name=name, entity=entity, save_dir=save_dir)
+    return WandbLogger(project=project, name=name, entity=entity, save_dir=save_dir,
+                       log_model=log_model)
 
 
 def log_scalar(logger_obj, key: str, value: float, step: int = 0) -> None:

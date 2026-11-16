@@ -1,7 +1,7 @@
 # One command per pipeline stage. Run everything from the repo root with the
 # `climx` conda env active.
 
-.PHONY: data preprocess climatology lps ffnn all verify submit
+.PHONY: data preprocess climatology lps ffnn worldmodel all verify submit
 
 # Download the Kaggle bundle and map it into data/lite/
 data:
@@ -21,6 +21,9 @@ lps:
 
 ffnn:
 	@python train.py experiment=ffnn
+
+worldmodel:
+	@python train.py experiment=worldmodel
 
 all: climatology lps ffnn
 
