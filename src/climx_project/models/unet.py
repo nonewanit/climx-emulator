@@ -89,6 +89,17 @@ class UNetModule(pl.LightningModule):
                 nn.ReLU(inplace=True),
                 nn.Linear(forcing_mlp_hidden, 8 * b),  # 4b scale + 4b shift
             )
+            # Identity init: at epoch 0 the head is a no-op (scale=1,
+            # shift=0), so training starts exactly on the baseline's
+            # trajectory and the head only ADDS the GHG pathway it learns.
+            # (The first run's random small scale/shift corrupted the
+            # bottleneck from epoch 0 — val_loss 4.5x the baseline and
+            # early stopping at epoch 4.)
+            last = self.forcing_mlp[-1]
+            nn.init.zeros_(last.weight)
+            with torch.no_grad():
+                last.bias[: 4 * b] = 1.0  # scale = 1
+                last.bias[4 * b:] = 0.0   # shift = 0
 
         self.enc1 = DoubleConv(n_in, b)
         self.enc2 = DoubleConv(b, 2 * b)
