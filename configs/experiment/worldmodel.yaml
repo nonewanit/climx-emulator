@@ -25,9 +25,13 @@ model:
     history_mask_prob: 0.1  # fraction of training windows replaced by the
                             # learned missing-history prior — what inference
                             # sees during the first tau days of a rollout
-    scheduled_sampling: 0.0  # fraction of batches whose window is a rollout
-                             # of the model's OWN predictions (stability
-                             # regularizer; try 0.1-0.3 once v0 trains)
+    scheduled_sampling: 0.25  # ANNEALED: 0 for the first ss_warmup_epochs,
+                              # then a linear ramp over ss_ramp_epochs to
+                              # this probability. v0 ran at full strength
+                              # from epoch 0 with garbage rollouts — that
+                              # (plus zero-init inference) caused the drift.
+    ss_warmup_epochs: 3
+    ss_ramp_epochs: 7
 trainer:
   max_epochs: 20
   batch_size: 64
@@ -50,4 +54,8 @@ logger:
   log_model: all     # upload every checkpoint as a W&B artifact on the run page
 
 record: true
+warm_start: true   # rollouts start from REAL physical states (2015-01-01
+                   # for the test — all scenarios branch from the same
+                   # historical end state — and 2081-01-01 for the
+                   # holdout), not the learned missing-history prior
 model_dir: null   # null -> results/models/worldmodel (runner default)

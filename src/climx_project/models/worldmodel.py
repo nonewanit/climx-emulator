@@ -105,7 +105,7 @@ class WorldModelModule(pl.LightningModule):
     def __init__(self, n_in=22, n_out=7, base_channels=64, tau=7,
                  variable_weights=None, learning_rate=1e-3, pad_to=(16, 32),
                  skip_connections=False, history_mask_prob=0.1,
-                 scheduled_sampling=0.0):
+                 scheduled_sampling=0.0, ss_warmup_epochs=3, ss_ramp_epochs=7):
         super().__init__()
         self.save_hyperparameters()
         b = base_channels
@@ -114,6 +114,8 @@ class WorldModelModule(pl.LightningModule):
         self.tau = int(tau)
         self.history_mask_prob = float(history_mask_prob)
         self.scheduled_sampling = float(scheduled_sampling)
+        self.ss_warmup_epochs = int(ss_warmup_epochs)
+        self.ss_ramp_epochs = int(ss_ramp_epochs)
         self.skip = bool(skip_connections)
         self.variable_weights = (
             torch.tensor(variable_weights, dtype=torch.float32)
@@ -271,14 +273,25 @@ class WorldModelModule(pl.LightningModule):
                  on_step=(split == "train"), on_epoch=True, sync_dist=True)
         return loss
 
+    def _ss_probability(self):
+        """Annealed scheduled sampling: 0 during warm-up, then a linear ramp
+        to self.scheduled_sampling. The v0 failure was firing at full
+        probability from epoch 0, when self-rollouts were garbage."""
+        if not self.training or self.scheduled_sampling <= 0:
+            return 0.0
+        ep = self.current_epoch
+        if ep < self.ss_warmup_epochs:
+            return 0.0
+        ramp = min(1.0, (ep - self.ss_warmup_epochs) / max(1, self.ss_ramp_epochs))
+        return self.scheduled_sampling * ramp
+
     def training_step(self, batch, batch_idx):
         f, history, y = batch
         mask = None
         if self.history_mask_prob > 0:
             full = torch.rand(f.shape[0], device=f.device) < self.history_mask_prob
             mask = full.unsqueeze(1).expand(-1, self.tau)
-        if self.scheduled_sampling > 0 and \
-                torch.rand(1, device=f.device).item() < self.scheduled_sampling:
+        if torch.rand(1, device=f.device).item() < self._ss_probability():
             history = self._rollout_history(f, history[:, 0])
             mask = None
         return self._step((f, history, y), "train", mask=mask)
@@ -336,6 +349,11 @@ class WorldModelEmulator(Emulator):
         self.model = WorldModelModule(**self.model_params)
         self.feature_vars = None
         self.target_vars = None
+        # Warm-start states: {first_year: (tau, 7, H, W) np array}. Real
+        # physical initial conditions for rollouts (the scenarios all branch
+        # from the same historical end state, so a training scenario's
+        # 2015-01-01 state IS the test scenario's initial state).
+        self.warm_start_states: dict = {}
 
     # ------------------------------------------------------------- training
 
@@ -415,15 +433,17 @@ class WorldModelEmulator(Emulator):
 
     # ------------------------------------------------------------- inference
 
-    def predict(self, X, *, target_vars=None):
+    def predict(self, X, *, target_vars=None, init_state=None):
         """Autoregressive rollout over the full test period.
 
-        Sequential: each day consumes the previous tau PREDICTED states; the
-        first tau days use the learned missing-history prior (zero anomaly =
-        climatology prior in this stationarized space). Encoded states are
-        cached so each state is encoded once, not tau times. Returns an
-        in-memory Dataset (lite-sized); the full-res port must stream to
-        zarr like UNetEmulator.predict.
+        Sequential: each day consumes the previous tau PREDICTED states. The
+        initial tau days come from `init_state` (real physical warm start)
+        when given, or from self.warm_start_states keyed by X's first year;
+        otherwise the learned missing-history prior is used (zero anomaly =
+        climatology prior). Encoded states are cached so each state is
+        encoded once, not tau times. Returns an in-memory Dataset
+        (lite-sized); the full-res port must stream to zarr like
+        UNetEmulator.predict.
         """
         self.model.eval()
         if target_vars is not None:
@@ -446,9 +466,17 @@ class WorldModelEmulator(Emulator):
         tau = self.model.tau
         h_grid, w_grid = arr.shape[2], arr.shape[3]
 
+        if init_state is None and self.warm_start_states:
+            year = int(X["time"].dt.year.values[0])
+            init_state = self.warm_start_states.get(year)
+            if init_state is not None:
+                logger.info("warm start from real state (year %d)", year)
+
         out = np.empty((n_time, len(self.target_vars), h_grid, w_grid),
                        dtype=np.float32)
         feat_cache: dict[int, torch.Tensor] = {}
+        if init_state is not None:
+            _seed_feat_cache(self.model, init_state, tau, device, feat_cache)
         bar = _pbar(range(n_time), desc="rollout predict")
         with torch.no_grad():
             for t in bar:
@@ -467,7 +495,8 @@ class WorldModelEmulator(Emulator):
             coords={"time": X["time"], "lat": X["lat"], "lon": X["lon"]},
         )
 
-    def rollout_profile(self, X, y, horizon_days=None, batch_days=256):
+    def rollout_profile(self, X, y, horizon_days=None, batch_days=256,
+                        init_state=None):
         """Error-accumulation profile (the Phase C stability analysis).
 
         X: (T, F, H, W) numpy forcings; y: (T, 7, H, W) numpy targets, in the
@@ -501,6 +530,8 @@ class WorldModelEmulator(Emulator):
 
             rollout = np.empty(n, dtype=np.float32)
             feat_cache: dict[int, torch.Tensor] = {}
+            if init_state is not None:
+                _seed_feat_cache(self.model, init_state, tau, device, feat_cache)
             bar = _pbar(range(n), desc="autoregressive")
             for t in bar:
                 if bar.disable and t % 100 == 0:
@@ -567,3 +598,17 @@ def _to_numpy_per_scenario(ds: xr.Dataset) -> dict:
            .values.astype(np.float32))
     names = [str(s) for s in ds.forcing_scenario.values]
     return {names[i]: np.ascontiguousarray(arr[i]) for i in range(len(names))}
+
+
+def _seed_feat_cache(model, init_state, tau, device, feat_cache):
+    """Pre-encode a real (tau, 7, H, W) warm-start window into the rollout
+    feature cache as days -tau..-1 — the rollout loop then consumes them
+    like its own predictions, and the learned missing-prior is never used."""
+    init = torch.from_numpy(np.ascontiguousarray(
+        np.asarray(init_state, dtype=np.float32))).to(device)
+    if init.shape[0] < tau:
+        raise ValueError(f"warm-start state has {init.shape[0]} days, need tau={tau}")
+    with torch.no_grad():
+        for k in range(tau):
+            frame = init[k:k + 1]                      # (1, 7, H, W)
+            feat_cache[k - tau] = model.encode_state(model._pad(frame))
