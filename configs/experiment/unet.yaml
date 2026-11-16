@@ -38,8 +38,13 @@ trainer:
                            # Weights saved as results/models/unet/metric_weights.npy
 
 logger:
-  backend: tensorboard
-  name: unet
+  backend: wandb
+  project: ClimX      # same project as the worldmodel / full-res runs
+  name: unet-lite
+  log_model: all      # every checkpoint also lands as a W&B artifact
+  # Local runs without WANDB_API_KEY auto-fall back to offline mode
+  # (results/runs/wandb/, sync later with `wandb sync`); use
+  # experiment.logger.backend=tensorboard for the local dashboard instead.
 
 record: true
 model_dir: null   # null -> results/models/unet (runner default)

@@ -117,8 +117,11 @@ class UNetModule(pl.LightningModule):
         else:
             weights = self.variable_weights.to(y_hat.device)
             loss = (weights.view(1, -1, 1, 1) * (y_hat - y) ** 2).mean()
+        # sync_dist=True: under DDP each rank otherwise logs only its own
+        # subset of the val batches, biasing early stopping and the best-ckpt
+        # choice (no-op on a single device). Same fix as the world model.
         self.log(f"{split}_loss", loss, prog_bar=True,
-                 on_step=(split == "train"), on_epoch=True)
+                 on_step=(split == "train"), on_epoch=True, sync_dist=True)
         return loss
 
     def training_step(self, batch, batch_idx):
