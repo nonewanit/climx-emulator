@@ -30,6 +30,16 @@ NON_TRAINER_KEYS = ("batch_size", "num_workers", "model_path", "max_days",
                     "metric_weights")
 
 
+def in_notebook_kernel() -> bool:
+    """True when running inside an active Jupyter kernel (widgets possible)."""
+    try:
+        from IPython import get_ipython
+        shell = get_ipython()
+        return shell is not None and "IPKernelApp" in getattr(shell, "config", {})
+    except Exception:
+        return False
+
+
 def is_real_terminal() -> bool:
     """True only for a real interactive terminal.
 
@@ -47,6 +57,29 @@ def is_real_terminal() -> bool:
     return not any(k in os.environ for k in markers)
 
 
+class ProgressLog(pl.Callback):
+    """One log line per epoch — progress visibility where the bars are
+    disabled (notebook subprocesses). No \r rewrites, so no capture spam."""
+
+    def __init__(self):
+        import time
+        self._t0 = time.time()
+
+    def on_train_epoch_end(self, trainer, *_):
+        import time
+        metrics = trainer.callback_metrics
+        ep = trainer.current_epoch + 1
+        tr = metrics.get("train_loss_epoch")
+        va = metrics.get("val_loss")
+        lr = trainer.optimizers[0].param_groups[0]["lr"]
+        dt_min = (time.time() - self._t0) / 60 / ep
+        logger.info("EPOCH %d/%d | train %.4f val %.4f | lr %.1e | %.1f min/ep",
+                    ep, trainer.max_epochs,
+                    float(tr) if tr is not None else float("nan"),
+                    float(va) if va is not None else float("nan"),
+                    lr, dt_min)
+
+
 def run_trainer(model: pl.LightningModule, load_fn, train_dl, val_dl, tp: dict):
     """Fit `model` with the shared callback policy; return it with best-val weights.
 
@@ -59,12 +92,14 @@ def run_trainer(model: pl.LightningModule, load_fn, train_dl, val_dl, tp: dict):
     # Lightning's TQDMProgressBar rewrites its line with \r on every refresh;
     # a notebook's captured `!python train.py` output renders each refresh as
     # a NEW line (hundreds of val-bar lines per epoch). In a real terminal
-    # \r works, so keep the bars; anywhere else (notebook subprocess —
+    # \r works, and inside a Jupyter KERNEL (%run) Lightning renders
+    # notebook-safe bars — keep them. Anywhere else (notebook subprocess —
     # detected by env markers, since Kaggle gives it a pty — or redirected
-    # logs), disable them and rely on the one-line per-epoch EarlyStopping
-    # log + W&B curves. An explicit `trainer.enable_progress_bar=true|false`
-    # config value wins (setdefault).
-    if not is_real_terminal():
+    # logs), disable the bars and add the per-epoch ProgressLog line. An
+    # explicit `trainer.enable_progress_bar=true|false` config value wins
+    # (setdefault).
+    bars_unsafe = not in_notebook_kernel() and not is_real_terminal()
+    if bars_unsafe:
         trainer_kwargs.setdefault("enable_progress_bar", False)
     model_path = Path(tp.get("model_path", "results/models/model"))
     model_path.mkdir(parents=True, exist_ok=True)
@@ -93,6 +128,9 @@ def run_trainer(model: pl.LightningModule, load_fn, train_dl, val_dl, tp: dict):
         patience=int(tp.get("early_stop_patience", 3)), min_delta=1e-4,
         verbose=True, check_on_train_epoch_end=False,
     ))
+    # Where the bars are disabled, one clean progress line per epoch instead.
+    if bars_unsafe:
+        callbacks.append(ProgressLog())
     trainer_kwargs["callbacks"] = callbacks
 
     trainer = pl.Trainer(**trainer_kwargs)

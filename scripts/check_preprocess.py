@@ -18,6 +18,7 @@ Run:  %run scripts/check_preprocess.py [--years 2015,2060]
 import argparse
 import json
 import logging
+import os
 from pathlib import Path
 
 import numpy as np
@@ -109,6 +110,10 @@ def eval_side(ds: xr.Dataset, year: int, feature_order, sc) -> np.ndarray:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--years", default="2015,2060")
+    ap.add_argument("--model", default=None,
+                    help="saved model path — only the FEATURE ORDER is used; "
+                         "default = derive it from the cache mount packages "
+                         "(the data-derived truth, no weights needed)")
     args = ap.parse_args()
 
     ensure_raw()
@@ -118,12 +123,25 @@ def main():
         shutil.copy2(BUNDLED, SCALING_JSON)
     sc = json.load(open(SCALING_JSON))["scaling_params"]
 
-    emulator = UNetEmulator(dict(
-        n_in=22, n_out=7, base_channels=64, learning_rate=1e-3,
-        variable_weights=[1.0, 1.5, 0.5, 0.5, 1.5, 1.5, 1.5],
-        pad_to=[192, 288], skip_connections=True))
-    emulator.load(MODEL)
-    feature_order = list(emulator.feature_vars)
+    # Feature order: the cache fit derives it from sorted X_*_<scenario>
+    # store names, so the mount packages ARE the ground truth (the channel
+    # order is a property of the cache, not of the weights). Fall back to
+    # loading the saved model only when no mounts are attached.
+    mounts = [d for d in os.environ.get("CLIMX_CACHE_INPUT_DIRS", "").split(":") if d]
+    feature_order = None
+    for d in mounts:
+        pkgs = sorted(Path(d).glob("X_*_ssp370.zarr.zarrpkg"))
+        if pkgs:
+            feature_order = [p.name.split("_", 1)[1].rsplit("_", 1)[0]
+                             for p in pkgs]
+            break
+    if feature_order is None:
+        emulator = UNetEmulator(dict(
+            n_in=22, n_out=7, base_channels=64, learning_rate=1e-3,
+            variable_weights=[1.0, 1.5, 0.5, 0.5, 1.5, 1.5, 1.5],
+            pad_to=[192, 288], skip_connections=True))
+        emulator.load(args.model or MODEL)
+        feature_order = list(emulator.feature_vars)
     log.info("feature order (%d): %s", len(feature_order), feature_order)
 
     ds = xr.open_dataset(RAW, engine="h5netcdf", chunks=CHUNKS)

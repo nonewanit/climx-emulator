@@ -72,16 +72,10 @@ def _pbar(iterable=None, *, desc=None, total=None):
     (same capture problem as Lightning's bars — see
     train_utils.is_real_terminal; the callers log progress lines instead)."""
     from tqdm.auto import tqdm
+    from .train_utils import in_notebook_kernel, is_real_terminal
 
     disable = False
-    try:
-        from IPython import get_ipython
-        shell = get_ipython()
-        in_kernel = shell is not None and "IPKernelApp" in getattr(shell, "config", {})
-    except Exception:
-        in_kernel = False
-    if not in_kernel:
-        from .train_utils import is_real_terminal
+    if not in_notebook_kernel():
         disable = not is_real_terminal()
     return tqdm(iterable, desc=desc, total=total, disable=disable)
 
@@ -458,7 +452,7 @@ class WorldModelEmulator(Emulator):
         bar = _pbar(range(n_time), desc="rollout predict")
         with torch.no_grad():
             for t in bar:
-                if bar.disable and t % 365 == 0:
+                if bar.disable and t % 100 == 0:
                     logger.info("rollout day %d/%d", t, n_time)
                 f = torch.from_numpy(arr[t]).unsqueeze(0).to(device)
                 feats = [feat_cache.get(t - tau + k) for k in range(tau)]
@@ -509,7 +503,7 @@ class WorldModelEmulator(Emulator):
             feat_cache: dict[int, torch.Tensor] = {}
             bar = _pbar(range(n), desc="autoregressive")
             for t in bar:
-                if bar.disable and t % 365 == 0:
+                if bar.disable and t % 100 == 0:
                     logger.info("profile rollout day %d/%d", t, n)
                 f = torch.from_numpy(X[t]).unsqueeze(0).to(device)
                 feats = [feat_cache.get(t - tau + k) for k in range(tau)]
