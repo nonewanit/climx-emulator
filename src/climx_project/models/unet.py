@@ -69,15 +69,19 @@ class UNetModule(pl.LightningModule):
         self.register_buffer("cell_weights",
                              None if cell_weights is None
                              else torch.as_tensor(cell_weights, dtype=torch.float32))
-        # Forcing head (FiLM-style): the broadcast scalar channels (5 GHG +
-        # seasonal encodings) are a WEAK signal path for conv layers — the
-        # trend diagnostics showed the models under-react (lite 0.73) or
+        # Forcing head (additive): the broadcast scalar channels (the 5 GHG
+        # series) are a WEAK signal path for conv layers — the trend
+        # diagnostics showed the models under-react (lite 0.73) or
         # anti-react (fullres -0.19) to the greenhouse forcing. The head
-        # encodes the scalars with an MLP and modulates the bottleneck
-        # features directly: scale + shift per channel. `scalar_channels`
-        # holds the input-channel indices of the spatially-constant channels
-        # (derived from the data at fit time — the lite and fullres channel
-        # orders differ).
+        # encodes the scalars with an MLP and ADDS the embedding to the
+        # bottleneck features (diffusion-style conditioning).
+        # `scalar_channels` holds the input-channel indices of the scalar
+        # channels (derived from the data at fit time — the lite and
+        # fullres channel orders differ).
+        # NOTE: the first version modulated multiplicatively (FiLM
+        # scale+shift); that was a genuine negative — the scale fights the
+        # decoder BatchNorm (which re-normalizes it) while its gradients
+        # stay large and noisy, and val_loss ran ~4.5x the baseline.
         self.forcing_head = bool(forcing_head)
         self.scalar_channels = list(scalar_channels or [])
         if self.forcing_head and self.scalar_channels:
@@ -87,19 +91,13 @@ class UNetModule(pl.LightningModule):
             self.forcing_mlp = nn.Sequential(
                 nn.Linear(len(self.scalar_channels), forcing_mlp_hidden),
                 nn.ReLU(inplace=True),
-                nn.Linear(forcing_mlp_hidden, 8 * b),  # 4b scale + 4b shift
+                nn.Linear(forcing_mlp_hidden, 4 * b),  # additive embedding
             )
-            # Identity init: at epoch 0 the head is a no-op (scale=1,
-            # shift=0), so training starts exactly on the baseline's
-            # trajectory and the head only ADDS the GHG pathway it learns.
-            # (The first run's random small scale/shift corrupted the
-            # bottleneck from epoch 0 — val_loss 4.5x the baseline and
-            # early stopping at epoch 4.)
+            # No-op at epoch 0: zero weights + zero bias -> the embedding is
+            # zero, so training starts exactly on the baseline's trajectory.
             last = self.forcing_mlp[-1]
             nn.init.zeros_(last.weight)
-            with torch.no_grad():
-                last.bias[: 4 * b] = 1.0  # scale = 1
-                last.bias[4 * b:] = 0.0   # shift = 0
+            nn.init.zeros_(last.bias)
 
         self.enc1 = DoubleConv(n_in, b)
         self.enc2 = DoubleConv(b, 2 * b)
@@ -136,8 +134,7 @@ class UNetModule(pl.LightningModule):
                 raise RuntimeError("forcing_head enabled without scalar "
                                    "channels — fit() must rebuild the module")
             scalars = x[:, self.scalar_channels, 0, 0]   # (B, n_scalar)
-            scale, shift = self.forcing_mlp(scalars).chunk(2, dim=1)
-            b = b * scale[:, :, None, None] + shift[:, :, None, None]
+            b = b + self.forcing_mlp(scalars)[:, :, None, None]
         d1_in = torch.cat([self.up1(b), e2], dim=1) if self.skip else self.up1(b)
         d1 = self.dec1(d1_in)
         d2_in = torch.cat([self.up2(d1), e1], dim=1) if self.skip else self.up2(d1)
