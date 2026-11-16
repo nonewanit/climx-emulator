@@ -50,6 +50,30 @@ from .unet import DEFAULT_VARIABLE_WEIGHTS, TARGET_VARIABLE_ORDER, DoubleConv
 
 logger = logging.getLogger(__name__)
 
+# The 22 preprocessed forcing channels, in the order preprocess.py writes
+# X_train.nc (5 GHG + 15 aerosol-split + 2 seasonal). Needed so a checkpoint
+# loaded via from_checkpoint() can select X[self.feature_vars]; fit() warns if
+# the actual files ever diverge from this contract.
+FORCING_VARIABLE_ORDER = [
+    "CO2_LBC", "N2O_LBC", "CH4_LBC", "CFC11eq_LBC", "CF2CL2_LBC",
+    "BC_AX_positive", "BC_AX_negative", "BC_AX_zeros_mask",
+    "BC_N_positive", "BC_N_negative", "BC_N_zeros_mask",
+    "SO2_positive", "SO2_negative", "SO2_zeros_mask",
+    "SO4_PR_positive", "SO4_PR_negative", "SO4_PR_zeros_mask",
+    "OM_NI_positive", "OM_NI_negative", "OM_NI_zeros_mask",
+    "sin_doy", "cos_doy",
+]
+
+
+def _pbar(iterable=None, *, desc=None, total=None):
+    """Progress bar: tqdm.notebook widgets inside a notebook kernel, plain
+    tqdm in scripts/subprocesses (`!python train.py` in a notebook has no
+    kernel attached, so widgets are impossible — tqdm.auto falls back to a
+    text bar automatically)."""
+    from tqdm.auto import tqdm
+
+    return tqdm(iterable, desc=desc, total=total)
+
 
 class ConvLSTMCell(nn.Module):
     """ConvLSTM cell (Shi et al. 2015), no peephole connections."""
@@ -317,6 +341,12 @@ class WorldModelEmulator(Emulator):
                 "dataset comes with the full-res port).")
         self.feature_vars = list(X_train.data_vars)
         self.target_vars = list(y_train.data_vars)
+        if self.feature_vars != FORCING_VARIABLE_ORDER:
+            logger.warning(
+                "X_train data_vars order differs from FORCING_VARIABLE_ORDER — "
+                "checkpoint-loaded predict() would select the WRONG channels. "
+                "Regenerate preprocessing or update the constant in "
+                "models/worldmodel.py.")
 
         tp = dict(trainer_params or {})
         tau = int(self.model_params.get("tau", 7))
@@ -412,9 +442,7 @@ class WorldModelEmulator(Emulator):
                        dtype=np.float32)
         feat_cache: dict[int, torch.Tensor] = {}
         with torch.no_grad():
-            for t in range(n_time):
-                if t % 365 == 0:
-                    logger.info("rollout day %d/%d", t, n_time)
+            for t in _pbar(range(n_time), desc="rollout predict"):
                 f = torch.from_numpy(arr[t]).unsqueeze(0).to(device)
                 feats = [feat_cache.get(t - tau + k) for k in range(tau)]
                 pred, pred_feat = self.model.rollout_step(f, feats)
@@ -450,7 +478,7 @@ class WorldModelEmulator(Emulator):
 
         one_step = np.full(n, np.nan, dtype=np.float32)
         with torch.no_grad():
-            for t0 in range(tau, n, batch_days):
+            for t0 in _pbar(range(tau, n, batch_days), desc="teacher-forced"):
                 t1 = min(n, t0 + batch_days)
                 f = torch.from_numpy(X[t0:t1]).to(device)
                 hist = torch.from_numpy(np.stack(
@@ -462,9 +490,7 @@ class WorldModelEmulator(Emulator):
 
             rollout = np.empty(n, dtype=np.float32)
             feat_cache: dict[int, torch.Tensor] = {}
-            for t in range(n):
-                if t % 365 == 0:
-                    logger.info("profile rollout day %d/%d", t, n)
+            for t in _pbar(range(n), desc="autoregressive"):
                 f = torch.from_numpy(X[t]).unsqueeze(0).to(device)
                 feats = [feat_cache.get(t - tau + k) for k in range(tau)]
                 pred, pred_feat = self.model.rollout_step(f, feats)
@@ -478,11 +504,16 @@ class WorldModelEmulator(Emulator):
 
     @classmethod
     def from_checkpoint(cls, ckpt_path):
-        """Build an emulator around a Lightning checkpoint (best-val weights)."""
+        """Build an emulator around a Lightning checkpoint (best-val weights).
+
+        Lightning checkpoints don't carry the data-derived feature order, so
+        feature_vars falls back to FORCING_VARIABLE_ORDER (the preprocessing
+        contract, cross-checked by fit()).
+        """
         module = WorldModelModule.load_from_checkpoint(str(ckpt_path))
         em = cls(dict(module.hparams))
         em.model = module
-        em.feature_vars = None
+        em.feature_vars = list(FORCING_VARIABLE_ORDER)
         em.target_vars = list(TARGET_VARIABLE_ORDER)
         return em
 
