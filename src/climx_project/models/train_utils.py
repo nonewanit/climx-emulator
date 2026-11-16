@@ -13,6 +13,7 @@ fluctuates at this scale and last != best.
 """
 
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -29,6 +30,23 @@ NON_TRAINER_KEYS = ("batch_size", "num_workers", "model_path", "max_days",
                     "metric_weights")
 
 
+def is_real_terminal() -> bool:
+    """True only for a real interactive terminal.
+
+    Notebook `!python ...` subprocesses (Kaggle/Colab/papermill) run under a
+    PTY, so sys.stdout.isatty() is True there — yet their captured output
+    renders every \r-updated bar refresh as a NEW line (the val-bar spam).
+    Jupyter marks such subprocesses with JPY_PARENT_PID in the inherited
+    environment; Kaggle additionally sets KAGGLE_KERNEL_RUN_TYPE, Colab
+    COLAB_*, papermill PAPERMILL_MILL.
+    """
+    if not sys.stdout.isatty():
+        return False
+    markers = ("JPY_PARENT_PID", "KAGGLE_KERNEL_RUN_TYPE",
+               "PAPERMILL_MILL", "COLAB_JUPYTER_IP")
+    return not any(k in os.environ for k in markers)
+
+
 def run_trainer(model: pl.LightningModule, load_fn, train_dl, val_dl, tp: dict):
     """Fit `model` with the shared callback policy; return it with best-val weights.
 
@@ -41,11 +59,12 @@ def run_trainer(model: pl.LightningModule, load_fn, train_dl, val_dl, tp: dict):
     # Lightning's TQDMProgressBar rewrites its line with \r on every refresh;
     # a notebook's captured `!python train.py` output renders each refresh as
     # a NEW line (hundreds of val-bar lines per epoch). In a real terminal
-    # \r works, so keep the bars; anywhere stdout is not a tty (notebook
-    # subprocess, redirected logs), disable them and rely on the one-line
-    # per-epoch EarlyStopping log + W&B curves. An explicit
-    # `trainer.enable_progress_bar=true|false` config value wins (setdefault).
-    if not sys.stdout.isatty():
+    # \r works, so keep the bars; anywhere else (notebook subprocess —
+    # detected by env markers, since Kaggle gives it a pty — or redirected
+    # logs), disable them and rely on the one-line per-epoch EarlyStopping
+    # log + W&B curves. An explicit `trainer.enable_progress_bar=true|false`
+    # config value wins (setdefault).
+    if not is_real_terminal():
         trainer_kwargs.setdefault("enable_progress_bar", False)
     model_path = Path(tp.get("model_path", "results/models/model"))
     model_path.mkdir(parents=True, exist_ok=True)

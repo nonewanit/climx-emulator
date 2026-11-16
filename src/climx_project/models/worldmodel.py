@@ -66,13 +66,24 @@ FORCING_VARIABLE_ORDER = [
 
 
 def _pbar(iterable=None, *, desc=None, total=None):
-    """Progress bar: tqdm.notebook widgets inside a notebook kernel, plain
-    tqdm in scripts/subprocesses (`!python train.py` in a notebook has no
-    kernel attached, so widgets are impossible — tqdm.auto falls back to a
-    text bar automatically)."""
+    """Progress bar: tqdm.notebook widgets inside a notebook kernel; plain
+    tqdm in a real terminal; DISABLED in notebook subprocesses and redirected
+    logs, where \r-updated text bars would render as one line per refresh
+    (same capture problem as Lightning's bars — see
+    train_utils.is_real_terminal; the callers log progress lines instead)."""
     from tqdm.auto import tqdm
 
-    return tqdm(iterable, desc=desc, total=total)
+    disable = False
+    try:
+        from IPython import get_ipython
+        shell = get_ipython()
+        in_kernel = shell is not None and "IPKernelApp" in getattr(shell, "config", {})
+    except Exception:
+        in_kernel = False
+    if not in_kernel:
+        from .train_utils import is_real_terminal
+        disable = not is_real_terminal()
+    return tqdm(iterable, desc=desc, total=total, disable=disable)
 
 
 class ConvLSTMCell(nn.Module):
@@ -444,8 +455,11 @@ class WorldModelEmulator(Emulator):
         out = np.empty((n_time, len(self.target_vars), h_grid, w_grid),
                        dtype=np.float32)
         feat_cache: dict[int, torch.Tensor] = {}
+        bar = _pbar(range(n_time), desc="rollout predict")
         with torch.no_grad():
-            for t in _pbar(range(n_time), desc="rollout predict"):
+            for t in bar:
+                if bar.disable and t % 365 == 0:
+                    logger.info("rollout day %d/%d", t, n_time)
                 f = torch.from_numpy(arr[t]).unsqueeze(0).to(device)
                 feats = [feat_cache.get(t - tau + k) for k in range(tau)]
                 pred, pred_feat = self.model.rollout_step(f, feats)
@@ -493,7 +507,10 @@ class WorldModelEmulator(Emulator):
 
             rollout = np.empty(n, dtype=np.float32)
             feat_cache: dict[int, torch.Tensor] = {}
-            for t in _pbar(range(n), desc="autoregressive"):
+            bar = _pbar(range(n), desc="autoregressive")
+            for t in bar:
+                if bar.disable and t % 365 == 0:
+                    logger.info("profile rollout day %d/%d", t, n)
                 f = torch.from_numpy(X[t]).unsqueeze(0).to(device)
                 feats = [feat_cache.get(t - tau + k) for k in range(tau)]
                 pred, pred_feat = self.model.rollout_step(f, feats)
