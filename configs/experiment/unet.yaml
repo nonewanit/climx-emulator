@@ -31,6 +31,11 @@ trainer:
                      # destabilize this 7.5 GB WSL machine.
   early_stop_patience: 3   # EarlyStopping on val_loss; raise max_epochs
                            # freely — the run stops itself when it plateaus
+  metric_weights: false    # true = A/B arm B: replace the hand-tuned
+                           # variable_weights with scorer-derived per-cell
+                           # weights (land mask + 1/Var + region + index
+                           # counts), computed once from the 2015-2080 GT.
+                           # Weights saved as results/models/unet/metric_weights.npy
 
 logger:
   backend: tensorboard

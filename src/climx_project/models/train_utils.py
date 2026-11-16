@@ -25,7 +25,8 @@ logger = logging.getLogger(__name__)
 # _fit_cached() and worldmodel.py's fit().
 NON_TRAINER_KEYS = ("batch_size", "num_workers", "model_path", "max_days",
                     "early_stop_patience", "checkpoint_every", "scenarios",
-                    "sample_step", "block_days", "cache_blocks")
+                    "sample_step", "block_days", "cache_blocks",
+                    "metric_weights")
 
 
 def run_trainer(model: pl.LightningModule, load_fn, train_dl, val_dl, tp: dict):

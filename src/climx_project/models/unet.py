@@ -52,7 +52,7 @@ class DoubleConv(nn.Module):
 class UNetModule(pl.LightningModule):
     def __init__(self, n_in=22, n_out=7, base_channels=64,
                  variable_weights=None, learning_rate=1e-3, pad_to=(16, 32),
-                 skip_connections=True):
+                 skip_connections=True, cell_weights=None):
         super().__init__()
         self.save_hyperparameters()
         b = base_channels
@@ -62,6 +62,12 @@ class UNetModule(pl.LightningModule):
             torch.tensor(variable_weights, dtype=torch.float32)
             if variable_weights is not None else torch.ones(n_out)
         )
+        # Optional scorer-derived per-cell, per-variable loss weights
+        # (n_out, H, W) on the NATIVE grid, from climx_project.metrics_weighting.
+        # When set, they REPLACE the hand-tuned variable_weights in the loss.
+        self.register_buffer("cell_weights",
+                             None if cell_weights is None
+                             else torch.as_tensor(cell_weights, dtype=torch.float32))
 
         self.enc1 = DoubleConv(n_in, b)
         self.enc2 = DoubleConv(b, 2 * b)
@@ -103,8 +109,14 @@ class UNetModule(pl.LightningModule):
     def _step(self, batch, split):
         x, y = batch  # x: (B, n_in, H, W), y: (B, n_out, H, W)
         y_hat = self(x)
-        weights = self.variable_weights.to(y_hat.device)
-        loss = (weights.view(1, -1, 1, 1) * (y_hat - y) ** 2).mean()
+        if self.cell_weights is not None:
+            # Metric-consistent loss (A/B arm B): scorer-derived per-cell,
+            # per-variable weights, mean-normalized so the loss scale stays
+            # comparable to the uniform-cell loss.
+            loss = (self.cell_weights * (y_hat - y) ** 2).mean()
+        else:
+            weights = self.variable_weights.to(y_hat.device)
+            loss = (weights.view(1, -1, 1, 1) * (y_hat - y) ** 2).mean()
         self.log(f"{split}_loss", loss, prog_bar=True,
                  on_step=(split == "train"), on_epoch=True)
         return loss
@@ -277,6 +289,22 @@ class UNetEmulator(Emulator):
         self.target_vars = list(y_train.data_vars)
 
         tp = dict(trainer_params or {})
+
+        # A/B arm B: replace the hand-tuned variable_weights with
+        # scorer-derived per-cell weights (land mask + 1/Var + region + index
+        # counts). Rebuild the module so the weights are registered as a
+        # buffer BEFORE fit (they then round-trip through the Lightning
+        # checkpoints via save_hyperparameters).
+        if tp.get("metric_weights"):
+            from .. import metrics_weighting
+
+            w = metrics_weighting.compute_metric_weights_for_fit(
+                y_train, self.target_vars)
+            model_path = Path(tp.get("model_path", "results/models/unet"))
+            model_path.mkdir(parents=True, exist_ok=True)
+            np.save(model_path / "metric_weights.npy", w)
+            self.model_params = dict(self.model_params, cell_weights=w)
+            self.model = UNetModule(**self.model_params)
 
         # Same split convention as the starter's NN (projections only, all
         # scenarios); val starts at 2081 to avoid the starter's overlapping
