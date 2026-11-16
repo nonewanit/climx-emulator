@@ -227,8 +227,10 @@ def main():
         land = decode_ar6_mask() >= 0
         years = np.array([t.year for t in time_cut.values])
         ys = np.unique(years)
-        g = np.array([gt_ds["tas"].values[years == y][:, land].mean() for y in ys])
-        p = np.array([pred_ds["tas"].values[years == y][:, land].mean() for y in ys])
+        g = np.array([gt_ds["tas"].values.astype(np.float64)[years == y][:, land].mean()
+                      for y in ys])
+        p = np.array([pred_ds["tas"].values.astype(np.float64)[years == y][:, land].mean()
+                      for y in ys])
         sg = np.polyfit(ys, g, 1)[0] * 10
         sp = np.polyfit(ys, p, 1)[0] * 10
         import matplotlib

@@ -552,11 +552,18 @@ class WorldModelEmulator(Emulator):
         # weights_only=False: the dict holds model_params + feature/target
         # var lists, not just tensors (torch>=2.6 defaults weights_only=True).
         ckpt = torch.load(path, map_location="cpu", weights_only=False)
-        self.model_params = ckpt["model_params"]
-        self.model = WorldModelModule(**self.model_params)
-        self.model.load_state_dict(ckpt["model_state"])
-        self.feature_vars = ckpt["feature_vars"]
-        self.target_vars = ckpt["target_vars"]
+        if "model_params" in ckpt:
+            self.model_params = ckpt["model_params"]
+            self.model = WorldModelModule(**self.model_params)
+            self.model.load_state_dict(ckpt["model_state"])
+            self.feature_vars = ckpt["feature_vars"]
+            self.target_vars = ckpt["target_vars"]
+        else:
+            # Older/alternate saves: a bare state_dict. Build from the
+            # params the emulator was constructed with and load the weights.
+            logger.warning("%s has no 'model_params' — treating it as a bare "
+                           "state_dict (feature/target vars stay as set)", path)
+            self.model.load_state_dict(ckpt)
 
 
 def _to_numpy_per_scenario(ds: xr.Dataset) -> dict:
