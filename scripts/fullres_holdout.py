@@ -217,6 +217,39 @@ def main():
         coords={"time": time_cut, "lat": lat, "lon": lon})
     del preds, gt_vars
 
+    # ---------- trend check: does the model capture the forced warming? ----------
+    # The scorer's per-cell R2 = 1 - MSE/Var over the test period is won or
+    # lost on the warming TREND in the temperature indices: slope ratio ~1
+    # means the model extracts the GHG signal; ~0 means no epoch count will
+    # fix the LB (the forcing encoding needs work instead).
+    try:
+        from climx_project.metrics_weighting import decode_ar6_mask
+        land = decode_ar6_mask() >= 0
+        years = np.array([t.year for t in time_cut.values])
+        ys = np.unique(years)
+        g = np.array([gt_ds["tas"].values[years == y][:, land].mean() for y in ys])
+        p = np.array([pred_ds["tas"].values[years == y][:, land].mean() for y in ys])
+        sg = np.polyfit(ys, g, 1)[0] * 10
+        sp = np.polyfit(ys, p, 1)[0] * 10
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        fig, ax = plt.subplots(figsize=(9, 4.5))
+        ax.plot(ys, g, "o-", label=f"GT ({sg:+.3f} K/dec)")
+        ax.plot(ys, p, "s-", label=f"predicted ({sp:+.3f} K/dec)")
+        ax.set_xlabel("year")
+        ax.set_ylabel("annual land-mean tas (K)")
+        ax.set_title(f"trend check — fullres {Path(args.model).name}")
+        ax.legend(); ax.grid(alpha=0.3); fig.tight_layout()
+        png = paths.RESULTS_DIR / "trend_diag_fullres_tas.png"
+        fig.savefig(png, dpi=110)
+        log.info("TREND: GT %+.3f K/dec | pred %+.3f K/dec | ratio %.2f | "
+                 "corr %.3f | plot %s",
+                 sg, sp, sp / sg if sg else float("nan"),
+                 float(np.corrcoef(p, g)[0, 1]), png)
+    except Exception as e:  # non-fatal: the score below is what matters
+        log.warning("trend check failed (non-fatal): %r", e)
+
     # ---------- indices (the patched SELECTED_INDICES) ----------
     hist = open_hist_from_mount(mounts, CACHE_DIR)
     pred_idx = compute_indices_eagerly(
