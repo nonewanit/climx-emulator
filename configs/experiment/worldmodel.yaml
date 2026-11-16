@@ -43,6 +43,12 @@ trainer:
   early_stop_patience: 5   # EarlyStopping on val_loss (teacher-forced —
                            # comparable with the unet's val_loss)
   checkpoint_every: 5      # periodic epoch snapshots next to the best-val ckpt
+  # Rollout-aware selection: early stopping on teacher-forced val_loss fires
+  # before scheduled sampling fully engages, and selects the best TEACHER,
+  # not the best ROLLER. Monitor a short warm-started val rollout instead:
+  rollout_monitor: true
+  rollout_days: 60         # rollout length for the per-epoch val rollout rmse
+  rollout_patience: 8      # early stop when val_rollout_rmse plateaus
   # Lightning progress bars are auto-disabled when stdout is not a tty
   # (notebook `!python ...` subprocess). Force with
   # experiment.trainer.enable_progress_bar=true|false.

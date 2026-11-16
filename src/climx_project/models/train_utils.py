@@ -27,7 +27,8 @@ logger = logging.getLogger(__name__)
 NON_TRAINER_KEYS = ("batch_size", "num_workers", "model_path", "max_days",
                     "early_stop_patience", "checkpoint_every", "scenarios",
                     "sample_step", "block_days", "cache_blocks",
-                    "metric_weights")
+                    "metric_weights", "rollout_monitor", "rollout_days",
+                    "rollout_patience")
 
 
 def in_notebook_kernel() -> bool:

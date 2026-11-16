@@ -314,6 +314,48 @@ class WorldModelModule(pl.LightningModule):
                                  "frequency": 1}}
 
 
+class RolloutMonitor(pl.Callback):
+    """Per-epoch val ROLLOUT rmse: early stopping and best-checkpoint
+    selection must watch what inference actually does (autoregressive
+    self-feeding), not the teacher-forced val_loss. Runs a short rollout
+    (default 60 days) warm-started from a REAL state on a fixed val window
+    and logs val_rollout_rmse.
+
+    Callback ORDER matters: the monitor must come BEFORE the checkpoint /
+    early-stopping callbacks that read its metric. The worldmodel fit
+    builds the window and prepends this callback to the list.
+    """
+
+    def __init__(self, X, y, init_state):
+        self.X = torch.from_numpy(np.ascontiguousarray(
+            np.asarray(X, dtype=np.float32)))
+        self.y = torch.from_numpy(np.ascontiguousarray(
+            np.asarray(y, dtype=np.float32)))
+        self.init_state = init_state
+        if len(self.y) < 10:
+            raise ValueError("rollout monitor window too short (<10 days)")
+
+    def on_validation_epoch_end(self, trainer, pl_module):
+        device = next(pl_module.parameters()).device
+        tau = pl_module.tau
+        feat_cache: dict[int, torch.Tensor] = {}
+        _seed_feat_cache(pl_module, self.init_state, tau, device, feat_cache)
+        errs = []
+        with torch.no_grad():
+            for t in range(self.X.shape[0]):
+                f = self.X[t:t + 1].to(device)
+                feats = [feat_cache.get(t - tau + k) for k in range(tau)]
+                pred, pred_feat = pl_module.rollout_step(f, feats)
+                feat_cache[t] = pred_feat
+                feat_cache.pop(t - tau, None)
+                errs.append(((pred - self.y[t:t + 1].to(device))
+                             .square().mean().sqrt().item()))
+        rmse = float(np.mean(errs))
+        pl_module.log("val_rollout_rmse", rmse, on_epoch=True, sync_dist=True)
+        logger.info("epoch %d val_rollout_rmse %.4f",
+                    pl_module.current_epoch, rmse)
+
+
 class _WindowDataset(Dataset):
     """(f_t, history, y_t) windows over per-scenario in-memory arrays.
 
@@ -425,6 +467,39 @@ class WorldModelEmulator(Emulator):
         val_dl = DataLoader(val_ds, batch_size=int(tp.get("batch_size", 64)),
                             shuffle=False,
                             num_workers=int(tp.get("num_workers", 0)))
+
+        # Rollout-aware model selection: early stopping on teacher-forced
+        # val_loss fires before scheduled sampling fully engages (anneal
+        # reaches full strength around epoch 10; v1 stopped at epoch 7) and
+        # picks the best TEACHER, not the best ROLLER. Monitor a short
+        # warm-started val rollout instead. run_trainer keeps the passed
+        # callbacks FIRST, so trainer.checkpoint_callback = the rollout
+        # checkpoint and the post-fit load uses the best roller.
+        if tp.get("rollout_monitor"):
+            from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
+
+            scen = "ssp370" if "ssp370" in xs_val else next(iter(xs_val))
+            days = int(tp.get("rollout_days", 60))
+            n = min(days, xs_val[scen].shape[0] - tau)
+            if n < 10:
+                raise RuntimeError(f"rollout window too short ({n} days) — "
+                                   "raise max_days or lower rollout_days")
+            init = ys_val[scen][:tau]                  # REAL warm start
+            logger.info("rollout monitor: %d days, scenario %s, warm start "
+                        "from real state", n, scen)
+            model_path = str(Path(tp.get("model_path", "results/models/worldmodel")))
+            tp["callbacks"] = [
+                RolloutMonitor(xs_val[scen][tau:tau + n],
+                               ys_val[scen][tau:tau + n], init),
+                ModelCheckpoint(monitor="val_rollout_rmse", mode="min",
+                                save_top_k=1, save_last=False,
+                                dirpath=model_path,
+                                filename="best-rollout-{epoch:02d}-{val_rollout_rmse:.4f}"),
+                EarlyStopping(monitor="val_rollout_rmse", mode="min",
+                              patience=int(tp.get("rollout_patience", 8)),
+                              min_delta=1e-4, verbose=True,
+                              check_on_train_epoch_end=False),
+            ]
 
         self.model = run_trainer(
             self.model,
