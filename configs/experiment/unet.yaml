@@ -22,11 +22,16 @@ model:
     # (192x288) where fine spatial detail exists.
     skip_connections: false
     # Forcing head (FiLM): MLP over the 5 GHG scalar channels modulating the
-    # bottleneck — the fix for the damped/broken GHG response (lite trend
-    # ratio 0.73, fullres -0.19). A/B via
-    # experiment.model.model_params.forcing_head=true; the scalar channels
-    # are derived from the data at fit time (2D-stored vars).
+    # bottleneck — NEGATIVE on lite (both FiLM and additive variants
+    # destabilized training). A/B via
+    # experiment.model.model_params.forcing_head=true.
     forcing_head: false
+    # Scalar HEAD: the GHG scalars added to the OUTPUT as a uniform
+    # per-variable offset — pattern scaling embedded in the network, at the
+    # most stable conditioning point (after all BatchNorms, direct
+    # gradient). A/B via
+    # experiment.model.model_params.scalar_head=true.
+    scalar_head: false
 trainer:
   max_epochs: 5
   batch_size: 64

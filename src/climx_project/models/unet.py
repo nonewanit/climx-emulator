@@ -53,7 +53,8 @@ class UNetModule(pl.LightningModule):
     def __init__(self, n_in=22, n_out=7, base_channels=64,
                  variable_weights=None, learning_rate=1e-3, pad_to=(16, 32),
                  skip_connections=True, cell_weights=None, forcing_head=False,
-                 forcing_mlp_hidden=128, scalar_channels=None):
+                 forcing_mlp_hidden=128, scalar_channels=None,
+                 scalar_head=False, scalar_head_hidden=32):
         super().__init__()
         self.save_hyperparameters()
         b = base_channels
@@ -98,6 +99,21 @@ class UNetModule(pl.LightningModule):
             last = self.forcing_mlp[-1]
             nn.init.zeros_(last.weight)
             nn.init.zeros_(last.bias)
+        # Scalar HEAD: the GHG scalars added directly to the OUTPUT as a
+        # spatially-uniform per-variable offset — pattern scaling embedded
+        # in the network (the MLP learns the linear GHG->offset response,
+        # the conv stack models the spatial structure). This is the most
+        # stable conditioning point: after every BatchNorm, with a direct
+        # gradient. Zero-init = exact no-op at epoch 0.
+        self.scalar_head = bool(scalar_head)
+        if self.scalar_head and self.scalar_channels:
+            self.scalar_mlp = nn.Sequential(
+                nn.Linear(len(self.scalar_channels), scalar_head_hidden),
+                nn.ReLU(inplace=True),
+                nn.Linear(scalar_head_hidden, n_out),
+            )
+            nn.init.zeros_(self.scalar_mlp[-1].weight)
+            nn.init.zeros_(self.scalar_mlp[-1].bias)
 
         self.enc1 = DoubleConv(n_in, b)
         self.enc2 = DoubleConv(b, 2 * b)
@@ -140,6 +156,12 @@ class UNetModule(pl.LightningModule):
         d2_in = torch.cat([self.up2(d1), e1], dim=1) if self.skip else self.up2(d1)
         d2 = self.dec2(d2_in)
         out = self.head(d2)
+        if self.scalar_head:
+            if not self.scalar_channels or not hasattr(self, "scalar_mlp"):
+                raise RuntimeError("scalar_head enabled without scalar "
+                                   "channels — fit() must rebuild the module")
+            scalars = x[:, self.scalar_channels, 0, 0]   # (B, n_scalar)
+            out = out + self.scalar_mlp(scalars)[:, :, None, None]
         return out[:, :, :h_in, :w_in]
 
     def _step(self, batch, split):
@@ -351,13 +373,12 @@ class UNetEmulator(Emulator):
         # to_array time — and their indices differ between the lite and
         # fullres channel orders, so derive them from the data, never
         # hardcode.
-        if self.model_params.get("forcing_head"):
+        if self.model_params.get("forcing_head") or self.model_params.get("scalar_head"):
             const = [i for i, v in enumerate(self.feature_vars)
                      if X_train[v].ndim == 2]
-            logger.info("forcing_head: scalar channels %s",
+            logger.info("scalar conditioning: channels %s",
                         [self.feature_vars[i] for i in const])
-            self.model_params = dict(self.model_params, forcing_head=True,
-                                     scalar_channels=const)
+            self.model_params = dict(self.model_params, scalar_channels=const)
             self.model = UNetModule(**self.model_params)
 
         # Same split convention as the starter's NN (projections only, all
